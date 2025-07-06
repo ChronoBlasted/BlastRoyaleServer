@@ -210,22 +210,22 @@ function getBlastPrice(blast: Blast): number {
 
     var coeffRarity = 1;
     switch (getBlastDataById(blast.data_id).rarity) {
-        case Rarity.COMMON:
+        case Rarity.Common:
             coeffRarity = 1;
             break;
-        case Rarity.UNCOMMON:
+        case Rarity.Uncommon:
             coeffRarity = 1.5;
             break;
-        case Rarity.RARE:
+        case Rarity.Rare:
             coeffRarity = 2;
             break;
-        case Rarity.EPIC:
+        case Rarity.Epic:
             coeffRarity = 3;
             break;
-        case Rarity.LEGENDARY:
+        case Rarity.Legendary:
             coeffRarity = 10;
             break;
-        case Rarity.UNIQUE:
+        case Rarity.Unique:
             coeffRarity = 5;
             break;
     }
@@ -239,22 +239,22 @@ function getItemPrice(item: Item): number {
     var itemData = getItemDataById(item.data_id)
 
     switch (itemData.rarity) {
-        case Rarity.COMMON:
+        case Rarity.Common:
             coeffRarity = 1;
             break;
-        case Rarity.UNCOMMON:
+        case Rarity.Uncommon:
             coeffRarity = 1.5;
             break;
-        case Rarity.RARE:
+        case Rarity.Rare:
             coeffRarity = 2;
             break;
-        case Rarity.EPIC:
+        case Rarity.Epic:
             coeffRarity = 3;
             break;
-        case Rarity.LEGENDARY:
+        case Rarity.Legendary:
             coeffRarity = 10;
             break;
-        case Rarity.UNIQUE:
+        case Rarity.Unique:
             coeffRarity = 5;
             break;
     }

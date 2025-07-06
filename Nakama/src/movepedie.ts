@@ -38,7 +38,7 @@ interface MoveEffectData {
 
 const Tackle: Move = {
     id: 1,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 40,
@@ -49,7 +49,7 @@ const Tackle: Move = {
 
 const Punch: Move = {
     id: 2,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 50,
@@ -60,7 +60,7 @@ const Punch: Move = {
 
 const Stomp: Move = {
     id: 3,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 65,
@@ -72,7 +72,7 @@ const Stomp: Move = {
 
 const Slam: Move = {
     id: 4,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
@@ -85,7 +85,7 @@ const Slam: Move = {
 
 const Claw: Move = {
     id: 5,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 30,
@@ -96,7 +96,7 @@ const Claw: Move = {
 
 const ClawCombo: Move = {
     id: 6,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 20,
@@ -109,7 +109,7 @@ const ClawCombo: Move = {
 
 const Slash: Move = {
     id: 7,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 60,
@@ -120,7 +120,7 @@ const Slash: Move = {
 
 const Cut: Move = {
     id: 8,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 80,
@@ -131,7 +131,7 @@ const Cut: Move = {
 
 const QuickAttack: Move = {
     id: 9,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 30,
@@ -143,7 +143,7 @@ const QuickAttack: Move = {
 
 const Growl: Move = {
     id: 10,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Status,
     target: Target.Opponent,
     power: 0,
@@ -156,7 +156,7 @@ const Growl: Move = {
 
 const Harden: Move = {
     id: 11,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -169,7 +169,7 @@ const Harden: Move = {
 
 const WarmUp: Move = {
     id: 12,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -182,7 +182,7 @@ const WarmUp: Move = {
 
 const Taunt: Move = {
     id: 13,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Status,
     target: Target.Opponent,
     power: 0,
@@ -196,7 +196,7 @@ const Taunt: Move = {
 
 const Cleanse: Move = {
     id: 14,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -209,7 +209,7 @@ const Cleanse: Move = {
 
 const Focus: Move = {
     id: 15,
-    type: Type.NORMAL,
+    type: Type.Normal,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -224,7 +224,7 @@ const Focus: Move = {
 
 const Ember: Move = {
     id: 101,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 50,
@@ -238,7 +238,7 @@ const Ember: Move = {
 
 const FirePunch: Move = {
     id: 102,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 70,
@@ -249,7 +249,7 @@ const FirePunch: Move = {
 
 const Flamethrower: Move = {
     id: 103,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
@@ -263,7 +263,7 @@ const Flamethrower: Move = {
 
 const FireBlast: Move = {
     id: 104,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 110,
@@ -277,7 +277,7 @@ const FireBlast: Move = {
 
 const FireWheel: Move = {
     id: 105,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 50,
@@ -291,7 +291,7 @@ const FireWheel: Move = {
 
 const Nitro: Move = {
     id: 106,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 60,
@@ -305,7 +305,7 @@ const Nitro: Move = {
 
 const Scald: Move = {
     id: 107,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
@@ -319,7 +319,7 @@ const Scald: Move = {
 
 const FlareBlitz: Move = {
     id: 108,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 110,
@@ -333,7 +333,7 @@ const FlareBlitz: Move = {
 
 const FireClaw: Move = {
     id: 109,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 100,
@@ -346,7 +346,7 @@ const FireClaw: Move = {
 
 const OverHeat: Move = {
     id: 110,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -359,7 +359,7 @@ const OverHeat: Move = {
 
 const Heatwave: Move = {
     id: 111,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -372,7 +372,7 @@ const Heatwave: Move = {
 
 const Combustion: Move = {
     id: 112,
-    type: Type.FIRE,
+    type: Type.Fire,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -389,7 +389,7 @@ const Combustion: Move = {
 
 const AquaJet: Move = {
     id: 201,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 50,
@@ -403,7 +403,7 @@ const AquaJet: Move = {
 
 const HydroTail: Move = {
     id: 202,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 65,
@@ -415,7 +415,7 @@ const HydroTail: Move = {
 
 const Waterfall: Move = {
     id: 203,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
@@ -428,7 +428,7 @@ const Waterfall: Move = {
 
 const HydroBlast: Move = {
     id: 204,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 110,
@@ -441,7 +441,7 @@ const HydroBlast: Move = {
 
 const Bubble: Move = {
     id: 205,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 50,
@@ -452,7 +452,7 @@ const Bubble: Move = {
 
 const BubbleBeam: Move = {
     id: 206,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 65,
@@ -463,7 +463,7 @@ const BubbleBeam: Move = {
 
 const Surf: Move = {
     id: 207,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
@@ -476,7 +476,7 @@ const Surf: Move = {
 
 const HydroCannon: Move = {
     id: 208,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 110,
@@ -489,7 +489,7 @@ const HydroCannon: Move = {
 
 const AquaClaw: Move = {
     id: 209,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 100,
@@ -502,7 +502,7 @@ const AquaClaw: Move = {
 
 const AquaBoost: Move = {
     id: 210,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -515,7 +515,7 @@ const AquaBoost: Move = {
 
 const AquaWall: Move = {
     id: 211,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -528,7 +528,7 @@ const AquaWall: Move = {
 
 const Splash: Move = {
     id: 212,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -541,7 +541,7 @@ const Splash: Move = {
 
 const Aquagym: Move = {
     id: 213,
-    type: Type.WATER,
+    type: Type.Water,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -556,7 +556,7 @@ const Aquagym: Move = {
 
 const Leafs: Move = {
     id: 301,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 50,
@@ -569,7 +569,7 @@ const Leafs: Move = {
 
 const RazorLeaf: Move = {
     id: 302,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 75,
@@ -582,7 +582,7 @@ const RazorLeaf: Move = {
 
 const VineWhip: Move = {
     id: 303,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 75,
@@ -595,7 +595,7 @@ const VineWhip: Move = {
 
 const GrassKnot: Move = {
     id: 304,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 100,
@@ -608,7 +608,7 @@ const GrassKnot: Move = {
 
 const FlowerStorm: Move = {
     id: 305,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 150,
@@ -621,7 +621,7 @@ const FlowerStorm: Move = {
 
 const GreenTempest: Move = {
     id: 306,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 50,
@@ -634,7 +634,7 @@ const GreenTempest: Move = {
 
 const MagikLeafs: Move = {
     id: 307,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 50,
@@ -647,7 +647,7 @@ const MagikLeafs: Move = {
 
 const EcoSphere: Move = {
     id: 308,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
@@ -660,7 +660,7 @@ const EcoSphere: Move = {
 
 const SolarBeam: Move = {
     id: 309,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Special,
     target: Target.Opponent,
     power: 120,
@@ -673,7 +673,7 @@ const SolarBeam: Move = {
 
 const GrassClaw: Move = {
     id: 310,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Normal,
     target: Target.Opponent,
     power: 100,
@@ -686,7 +686,7 @@ const GrassClaw: Move = {
 
 const Growth: Move = {
     id: 311,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -699,7 +699,7 @@ const Growth: Move = {
 
 const Roots: Move = {
     id: 312,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
@@ -712,7 +712,7 @@ const Roots: Move = {
 
 const Spore: Move = {
     id: 313,
-    type: Type.GRASS,
+    type: Type.Grass,
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,

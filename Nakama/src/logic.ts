@@ -90,9 +90,10 @@ function calculateDamage(
     defenderType: Type,
     movePower: number,
     meteo: Meteo,
+    logger: nkruntime.Logger
 ): number {
     const weatherModifier = calculateWeatherModifier(meteo, attackType);
-    const typeMultiplier = getTypeMultiplier(attackType, defenderType);
+    const typeMultiplier = getTypeMultiplier(attackType, defenderType, logger);
 
     const baseDamage = ((2 * attackerLevel / 5 + 2) * movePower * (attackerAttack / defenderDefense)) / 50;
 
@@ -102,97 +103,97 @@ function calculateDamage(
 }
 
 
-function getTypeMultiplier(moveType: Type, defenderType: Type): number {
+function getTypeMultiplier(moveType: Type, defenderType: Type, logger: nkruntime.Logger): number {
     switch (moveType) {
-        case Type.FIRE:
+        case Type.Fire:
             switch (defenderType) {
-                case Type.GRASS:
+                case Type.Grass:
                     return 2;
-                case Type.WATER:
+                case Type.Water:
                     return 0.5;
                 default:
                     return 1;
             }
 
-        case Type.WATER:
+        case Type.Water:
             switch (defenderType) {
-                case Type.FIRE:
+                case Type.Fire:
                     return 2;
-                case Type.GRASS:
+                case Type.Grass:
                     return 0.5;
                 default:
                     return 1;
             }
 
-        case Type.GRASS:
+        case Type.Grass:
             switch (defenderType) {
-                case Type.WATER:
+                case Type.Water:
                     return 2;
-                case Type.FIRE:
+                case Type.Fire:
                     return 0.5;
                 default:
                     return 1;
             }
 
-        case Type.NORMAL:
+        case Type.Normal:
             switch (defenderType) {
-                case Type.LIGHT:
+                case Type.Light:
                     return 0.5;
-                case Type.DARK:
+                case Type.Dark:
                     return 0.5;
                 default:
                     return 1;
             }
 
-        case Type.GROUND:
+        case Type.Ground:
             switch (defenderType) {
-                case Type.ELECTRIC:
+                case Type.Electric:
                     return 2;
-                case Type.FLY:
+                case Type.Fly:
                     return 0;
                 default:
                     return 1;
             }
 
-        case Type.FLY:
+        case Type.Fly:
             switch (defenderType) {
-                case Type.ELECTRIC:
+                case Type.Electric:
                     return 0;
-                case Type.GROUND:
+                case Type.Ground:
                     return 2;
                 default:
                     return 1;
             }
 
-        case Type.ELECTRIC:
+        case Type.Electric:
             switch (defenderType) {
-                case Type.GROUND:
+                case Type.Ground:
                     return 0;
-                case Type.FLY:
+                case Type.Fly:
                     return 2;
                 default:
                     return 1;
             }
 
-        case Type.LIGHT:
+        case Type.Light:
             switch (defenderType) {
-                case Type.DARK:
+                case Type.Dark:
                     return 2;
-                case Type.NORMAL:
+                case Type.Normal:
                     return 2;
-                case Type.LIGHT:
+                case Type.Light:
                     return 0.5;
                 default:
                     return 1;
             }
 
-        case Type.DARK:
+        case Type.Dark:
             switch (defenderType) {
-                case Type.LIGHT:
+                case Type.Light:
                     return 2;
-                case Type.NORMAL:
+                case Type.Normal:
                     return 2;
-                case Type.DARK:
+                case Type.Dark:
                     return 0.5;
                 default:
                     return 1;
@@ -208,19 +209,19 @@ function calculateWeatherModifier(weather: Meteo, moveType: Type): number {
 
     switch (weather) {
         case Meteo.Sun:
-            if (moveType === Type.FIRE) {
+            if (moveType === Type.Fire) {
                 modifier = 1.5;
             }
             break;
 
         case Meteo.Rain:
-            if (moveType === Type.WATER) {
+            if (moveType === Type.Water) {
                 modifier = 1.5;
             }
             break;
 
         case Meteo.Leaves:
-            if (moveType === Type.GRASS) {
+            if (moveType === Type.Grass) {
                 modifier = 1.5;
             }
 
@@ -545,4 +546,10 @@ function getBlastVersion(blast: Blast) : number {
     } else {
         return 1;
     }
+}
+
+function parseEnum<T>(value: string, enumObj: any): T {
+    const enumValue = enumObj[value];
+    if (typeof enumValue === "number") return enumValue as T;
+    throw new Error(`Invalid enum value '${value}' for enum ${JSON.stringify(enumObj)}`);
 }

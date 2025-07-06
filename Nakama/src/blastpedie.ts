@@ -87,7 +87,7 @@ class BlastEntity {
 
 const Pantin: BlastData = { // NORMAL
     id: 0,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 80, mana: 75, attack: 70, defense: 65, speed: 60,
     movepool: [
         { move_id: Tackle.id, levelMin: 0 },
@@ -99,12 +99,12 @@ const Pantin: BlastData = { // NORMAL
         { move_id: Slash.id, levelMin: 18 },
         { move_id: Cut.id, levelMin: 21 },
     ],
-    nextEvolution: null, catchRate: 30, expYield: 64, rarity: Rarity.COMMON,
+    nextEvolution: null, catchRate: 30, expYield: 64, rarity: Rarity.Common,
 };
 
 const Lizzy: BlastData = { // GRASS
     id: 1,
-    type: Type.GRASS,
+    type: Type.Grass,
     hp: 70, mana: 80, attack: 75, defense: 70, speed: 65,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
@@ -120,12 +120,12 @@ const Lizzy: BlastData = { // GRASS
         { move_id: EcoSphere.id, levelMin: 28 },
         { move_id: SolarBeam.id, levelMin: 32 },
     ],
-    nextEvolution: null, catchRate: 35, expYield: 128, rarity: Rarity.RARE,
+    nextEvolution: null, catchRate: 35, expYield: 128, rarity: Rarity.Rare,
 };
 
 const Punchball: BlastData = { // FIRE
     id: 2,
-    type: Type.FIRE,
+    type: Type.Fire,
     hp: 85, mana: 70, attack: 80, defense: 75, speed: 60,
     movepool: [
         { move_id: Ember.id, levelMin: 0 },
@@ -139,12 +139,12 @@ const Punchball: BlastData = { // FIRE
         { move_id: FlareBlitz.id, levelMin: 28 },
         { move_id: FireClaw.id, levelMin: 32 },
     ],
-    nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.RARE,
+    nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.Rare,
 };
 
 const Jellys: BlastData = { // WATER
     id: 3,
-    type: Type.WATER,
+    type: Type.Water,
     hp: 75, mana: 85, attack: 70, defense: 65, speed: 80,
     movepool: [
         { move_id: AquaJet.id, levelMin: 0 },
@@ -158,12 +158,12 @@ const Jellys: BlastData = { // WATER
         { move_id: Surf.id, levelMin: 24 },
         { move_id: HydroCannon.id, levelMin: 28 },
     ],
-    nextEvolution: null, catchRate: 25, expYield: 128, rarity: Rarity.RARE,
+    nextEvolution: null, catchRate: 25, expYield: 128, rarity: Rarity.Rare,
 };
 
 const Kitchi: BlastData = { // NORMAL
     id: 4,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 55, mana: 70, attack: 75, defense: 65, speed: 80,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
@@ -175,12 +175,12 @@ const Kitchi: BlastData = { // NORMAL
         { move_id: Slash.id, levelMin: 14 },
         { move_id: Cut.id, levelMin: 16 },
     ],
-    nextEvolution: { id: 5, levelRequired: 7 }, catchRate: 30, expYield: 64, rarity: Rarity.COMMON,
+    nextEvolution: { id: 5, levelRequired: 7 }, catchRate: 30, expYield: 64, rarity: Rarity.Common,
 };
 
 const Kenchi: BlastData = { // NORMAL
     id: 5,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 50, mana: 70, attack: 80, defense: 70, speed: 65,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
@@ -192,12 +192,12 @@ const Kenchi: BlastData = { // NORMAL
         { move_id: Slash.id, levelMin: 14 },
         { move_id: Cut.id, levelMin: 16 },
     ],
-    nextEvolution: null, catchRate: 35, expYield: 96, rarity: Rarity.UNCOMMON,
+    nextEvolution: null, catchRate: 35, expYield: 96, rarity: Rarity.Uncommon,
 };
 
 const Mousy: BlastData = { // NORMAL
     id: 6,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 50, mana: 75, attack: 75, defense: 70, speed: 80,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
@@ -209,12 +209,12 @@ const Mousy: BlastData = { // NORMAL
         { move_id: Slash.id, levelMin: 14 },
         { move_id: Cut.id, levelMin: 16 },
     ],
-    nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.COMMON,
+    nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.Common,
 };
 
 const Clawball: BlastData = { // NORMAL (GROUND n'a pas d'attaque dédiée)
     id: 7,
-    type: Type.GROUND,
+    type: Type.Ground,
     hp: 47, mana: 70, attack: 75, defense: 80, speed: 65,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
@@ -230,12 +230,12 @@ const Clawball: BlastData = { // NORMAL (GROUND n'a pas d'attaque dédiée)
         { move_id: Harden.id, levelMin: 26 },
         { move_id: Cleanse.id, levelMin: 32 },
     ],
-    nextEvolution: null, catchRate: 45, expYield: 90, rarity: Rarity.UNCOMMON,
+    nextEvolution: null, catchRate: 45, expYield: 90, rarity: Rarity.Uncommon,
 };
 
 const Balt: BlastData = { // NORMAL (FLY n'a pas d'attaque dédiée)
     id: 8,
-    type: Type.FLY,
+    type: Type.Fly,
     hp: 70, mana: 80, attack: 75, defense: 70, speed: 85,
     movepool: [
         { move_id: Tackle.id, levelMin: 0 },
@@ -243,12 +243,12 @@ const Balt: BlastData = { // NORMAL (FLY n'a pas d'attaque dédiée)
         { move_id: Stomp.id, levelMin: 8 },
         { move_id: Harden.id, levelMin: 12 },
     ],
-    nextEvolution: null, catchRate: 50, expYield: 96, rarity: Rarity.COMMON,
+    nextEvolution: null, catchRate: 50, expYield: 96, rarity: Rarity.Common,
 };
 
 const Stagpan: BlastData = { // NORMAL
     id: 9,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75, mana: 70, attack: 80, defense: 65, speed: 70,
     movepool: [
         { move_id: Punch.id, levelMin: 0 },
@@ -256,12 +256,12 @@ const Stagpan: BlastData = { // NORMAL
         { move_id: Slam.id, levelMin: 8 },
         { move_id: QuickAttack.id, levelMin: 12 },
     ],
-    nextEvolution: null, catchRate: 30, expYield: 64, rarity: Rarity.COMMON,
+    nextEvolution: null, catchRate: 30, expYield: 64, rarity: Rarity.Common,
 };
 
 const Botte: BlastData = { // NORMAL (GROUND n'a pas d'attaque dédiée)
     id: 10,
-    type: Type.GROUND,
+    type: Type.Ground,
     hp: 80, mana: 75, attack: 70, defense: 85, speed: 65,
     movepool: [
         { move_id: Growl.id, levelMin: 0 },
@@ -269,12 +269,12 @@ const Botte: BlastData = { // NORMAL (GROUND n'a pas d'attaque dédiée)
         { move_id: Cleanse.id, levelMin: 8 },
         { move_id: Tackle.id, levelMin: 12 },
     ],
-    nextEvolution: null, catchRate: 35, expYield: 128, rarity: Rarity.RARE,
+    nextEvolution: null, catchRate: 35, expYield: 128, rarity: Rarity.Rare,
 };
 
 const Booh: BlastData = { // NORMAL
     id: 11,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 70, mana: 75, attack: 65, defense: 70, speed: 80,
     movepool: [
         { move_id: Slash.id, levelMin: 0 },
@@ -282,12 +282,12 @@ const Booh: BlastData = { // NORMAL
         { move_id: Claw.id, levelMin: 8 },
         { move_id: ClawCombo.id, levelMin: 12 },
     ],
-    nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.UNCOMMON,
+    nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.Uncommon,
 };
 
 const Ghoosto: BlastData = { // NORMAL
     id: 12,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75, mana: 70, attack: 80, defense: 65, speed: 70,
     movepool: [
         { move_id: Punch.id, levelMin: 0 },
@@ -295,12 +295,12 @@ const Ghoosto: BlastData = { // NORMAL
         { move_id: QuickAttack.id, levelMin: 8 },
         { move_id: Growl.id, levelMin: 12 },
     ],
-    nextEvolution: null, catchRate: 45, expYield: 160, rarity: Rarity.RARE,
+    nextEvolution: null, catchRate: 45, expYield: 160, rarity: Rarity.Rare,
 };
 
 const Goblin: BlastData = { // NORMAL
     id: 13,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 70, mana: 75, attack: 75, defense: 70, speed: 80,
     movepool: [
         { move_id: Stomp.id, levelMin: 0 },
@@ -308,12 +308,12 @@ const Goblin: BlastData = { // NORMAL
         { move_id: Cleanse.id, levelMin: 8 },
         { move_id: Tackle.id, levelMin: 12 },
     ],
-    nextEvolution: null, catchRate: 35, expYield: 256, rarity: Rarity.COMMON,
+    nextEvolution: null, catchRate: 35, expYield: 256, rarity: Rarity.Common,
 };
 
 const MiniDevil: BlastData = { // NORMAL
     id: 14,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75, mana: 70, attack: 80, defense: 65, speed: 70,
     movepool: [
         { move_id: Slash.id, levelMin: 0 },
@@ -321,12 +321,12 @@ const MiniDevil: BlastData = { // NORMAL
         { move_id: Claw.id, levelMin: 8 },
         { move_id: ClawCombo.id, levelMin: 12 },
     ],
-    nextEvolution: null, catchRate: 40, expYield: 96, rarity: Rarity.UNCOMMON,
+    nextEvolution: null, catchRate: 40, expYield: 96, rarity: Rarity.Uncommon,
 };
 
 const DevilDare: BlastData = { // DevilDare
     id: 15,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 80,
     mana: 75,
     attack: 70,
@@ -340,12 +340,12 @@ const DevilDare: BlastData = { // DevilDare
     nextEvolution: null,
     catchRate: 45,
     expYield: 128,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const Masks: BlastData = { // Masks
     id: 16,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 70,
     mana: 75,
     attack: 65,
@@ -358,12 +358,12 @@ const Masks: BlastData = { // Masks
     nextEvolution: null,
     catchRate: 50,
     expYield: 128,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const Luckun: BlastData = { // Luckun
     id: 17,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75,
     mana: 70,
     attack: 80,
@@ -376,12 +376,12 @@ const Luckun: BlastData = { // Luckun
     nextEvolution: null,
     catchRate: 30,
     expYield: 256,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const MiniHam: BlastData = { // MiniHam
     id: 18,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 70,
     mana: 75,
     attack: 65,
@@ -395,12 +395,12 @@ const MiniHam: BlastData = { // MiniHam
     nextEvolution: null,
     catchRate: 35,
     expYield: 64,
-    rarity: Rarity.UNCOMMON,
+    rarity: Rarity.Uncommon,
 };
 
 const SadHam: BlastData = { // SadHam
     id: 19,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75,
     mana: 70,
     attack: 80,
@@ -413,12 +413,12 @@ const SadHam: BlastData = { // SadHam
     nextEvolution: null,
     catchRate: 40,
     expYield: 128,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const MoiHam: BlastData = { // MoiHam
     id: 20,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 80,
     mana: 75,
     attack: 70,
@@ -431,12 +431,12 @@ const MoiHam: BlastData = { // MoiHam
     nextEvolution: null,
     catchRate: 45,
     expYield: 256,
-    rarity: Rarity.EPIC,
+    rarity: Rarity.Epic,
 };
 
 const Bearos: BlastData = { // Bearos
     id: 21,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 70,
     mana: 75,
     attack: 65,
@@ -449,12 +449,12 @@ const Bearos: BlastData = { // Bearos
     nextEvolution: null,
     catchRate: 50,
     expYield: 160,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const Treex: BlastData = { // Treex
     id: 22,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75,
     mana: 70,
     attack: 80,
@@ -467,12 +467,12 @@ const Treex: BlastData = { // Treex
     nextEvolution: null,
     catchRate: 30,
     expYield: 192,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const Moutmout: BlastData = { // Moutmout
     id: 23,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 70,
     mana: 75,
     attack: 65,
@@ -485,12 +485,12 @@ const Moutmout: BlastData = { // Moutmout
     nextEvolution: null,
     catchRate: 35,
     expYield: 128,
-    rarity: Rarity.UNCOMMON,
+    rarity: Rarity.Uncommon,
 };
 
 const Piggy: BlastData = { // Piggy
     id: 24,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75,
     mana: 70,
     attack: 80,
@@ -503,12 +503,12 @@ const Piggy: BlastData = { // Piggy
     nextEvolution: null,
     catchRate: 40,
     expYield: 160,
-    rarity: Rarity.UNCOMMON,
+    rarity: Rarity.Uncommon,
 };
 
 const Bleaub: BlastData = { // Bleaub
     id: 25,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 70,
     mana: 75,
     attack: 65,
@@ -521,12 +521,12 @@ const Bleaub: BlastData = { // Bleaub
     nextEvolution: null,
     catchRate: 45,
     expYield: 80,
-    rarity: Rarity.COMMON,
+    rarity: Rarity.Common,
 };
 
 const Shroom: BlastData = { // Shroom
     id: 26,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 75,
     mana: 70,
     attack: 80,
@@ -539,12 +539,12 @@ const Shroom: BlastData = { // Shroom
     nextEvolution: null,
     catchRate: 50,
     expYield: 96,
-    rarity: Rarity.COMMON,
+    rarity: Rarity.Common,
 };
 
 const Lantern: BlastData = { // Lantern
     id: 27,
-    type: Type.WATER,
+    type: Type.Water,
     hp: 70,
     mana: 75,
     attack: 65,
@@ -558,12 +558,12 @@ const Lantern: BlastData = { // Lantern
     nextEvolution: null,
     catchRate: 30,
     expYield: 112,
-    rarity: Rarity.COMMON,
+    rarity: Rarity.Common,
 };
 
 const Droplet: BlastData = { // Droplet
     id: 28,
-    type: Type.WATER,
+    type: Type.Water,
     hp: 75,
     mana: 70,
     attack: 80,
@@ -577,11 +577,11 @@ const Droplet: BlastData = { // Droplet
     nextEvolution: null,
     catchRate: 35,
     expYield: 150,
-    rarity: Rarity.EPIC,
+    rarity: Rarity.Epic,
 };
 const Fireball: BlastData = { // Fireball
     id: 29,
-    type: Type.FIRE,
+    type: Type.Fire,
     hp: 80,
     mana: 60,
     attack: 90,
@@ -595,12 +595,12 @@ const Fireball: BlastData = { // Fireball
     nextEvolution: null,
     catchRate: 40,
     expYield: 150,
-    rarity: Rarity.EPIC,
+    rarity: Rarity.Epic,
 };
 
 const Mystical: BlastData = { // Mystical
     id: 30,
-    type: Type.LIGHT,
+    type: Type.Light,
     hp: 75,
     mana: 65,
     attack: 85,
@@ -613,12 +613,12 @@ const Mystical: BlastData = { // Mystical
     nextEvolution: null,
     catchRate: 45,
     expYield: 150,
-    rarity: Rarity.EPIC,
+    rarity: Rarity.Epic,
 };
 
 const Clover: BlastData = { // Clover
     id: 31,
-    type: Type.DARK,
+    type: Type.Dark,
     hp: 70,
     mana: 70,
     attack: 80,
@@ -631,12 +631,12 @@ const Clover: BlastData = { // Clover
     nextEvolution: null,
     catchRate: 50,
     expYield: 112,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const Scorlov: BlastData = { // Scorlov
     id: 32,
-    type: Type.DARK,
+    type: Type.Dark,
     hp: 85,
     mana: 55,
     attack: 75,
@@ -650,12 +650,12 @@ const Scorlov: BlastData = { // Scorlov
     nextEvolution: null,
     catchRate: 30,
     expYield: 128,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const Wormie: BlastData = { // Wormie
     id: 33,
-    type: Type.GRASS,
+    type: Type.Grass,
     hp: 60,
     mana: 80,
     attack: 70,
@@ -671,12 +671,12 @@ const Wormie: BlastData = { // Wormie
     nextEvolution: null,
     catchRate: 35,
     expYield: 99,
-    rarity: Rarity.COMMON,
+    rarity: Rarity.Common,
 };
 
 const Skel: BlastData = { // Skel
     id: 34,
-    type: Type.DARK,
+    type: Type.Dark,
     hp: 70,
     mana: 70,
     attack: 70,
@@ -690,12 +690,12 @@ const Skel: BlastData = { // Skel
     nextEvolution: null,
     catchRate: 40,
     expYield: 77,
-    rarity: Rarity.COMMON,
+    rarity: Rarity.Common,
 };
 
 const Frederic: BlastData = { // Frederic
     id: 35,
-    type: Type.LIGHT,
+    type: Type.Light,
     hp: 75,
     mana: 65,
     attack: 85,
@@ -710,12 +710,12 @@ const Frederic: BlastData = { // Frederic
     nextEvolution: null,
     catchRate: 45,
     expYield: 69,
-    rarity: Rarity.UNCOMMON,
+    rarity: Rarity.Uncommon,
 };
 
 const Smoky: BlastData = { // Smoky
     id: 36,
-    type: Type.WATER,
+    type: Type.Water,
     hp: 80,
     mana: 60,
     attack: 90,
@@ -731,12 +731,12 @@ const Smoky: BlastData = { // Smoky
     nextEvolution: null,
     catchRate: 45,
     expYield: 130,
-    rarity: Rarity.UNCOMMON,
+    rarity: Rarity.Uncommon,
 };
 
 const Forty: BlastData = { // Forty
     id: 37,
-    type: Type.GROUND,
+    type: Type.Ground,
     hp: 100,
     mana: 55,
     attack: 45,
@@ -750,12 +750,12 @@ const Forty: BlastData = { // Forty
     nextEvolution: null,
     catchRate: 50,
     expYield: 212,
-    rarity: Rarity.RARE,
+    rarity: Rarity.Rare,
 };
 
 const Bud: BlastData = { // Bud
     id: 38,
-    type: Type.DARK,
+    type: Type.Dark,
     hp: 60,
     mana: 80,
     attack: 70,
@@ -769,12 +769,12 @@ const Bud: BlastData = { // Bud
     nextEvolution: null,
     catchRate: 30,
     expYield: 169,
-    rarity: Rarity.UNCOMMON,
+    rarity: Rarity.Uncommon,
 };
 
 const Hiboo: BlastData = { // Hiboo
     id: 39,
-    type: Type.NORMAL,
+    type: Type.Normal,
     hp: 90,
     mana: 100,
     attack: 80,
@@ -787,12 +787,12 @@ const Hiboo: BlastData = { // Hiboo
     nextEvolution: null,
     catchRate: 35,
     expYield: 222,
-    rarity: Rarity.LEGENDARY,
+    rarity: Rarity.Legendary,
 };
 
 const Eggy: BlastData = { // Eggy
     id: 40,
-    type: Type.GROUND,
+    type: Type.Ground,
     hp: 100,
     mana: 40,
     attack: 30,
@@ -805,12 +805,12 @@ const Eggy: BlastData = { // Eggy
     nextEvolution: null,
     catchRate: 40,
     expYield: 118,
-    rarity: Rarity.EPIC,
+    rarity: Rarity.Epic,
 };
 
 const Dracoblast: BlastData = { // Dracoblast
     id: 41,
-    type: Type.FLY,
+    type: Type.Fly,
     hp: 90,
     mana: 90,
     attack: 90,
@@ -826,12 +826,12 @@ const Dracoblast: BlastData = { // Dracoblast
     nextEvolution: null,
     catchRate: 45,
     expYield: 255,
-    rarity: Rarity.LEGENDARY,
+    rarity: Rarity.Legendary,
 };
 
 const Cerberus: BlastData = { // Cerberus
     id: 42,
-    type: Type.FIRE,
+    type: Type.Fire,
     hp: 100,
     mana: 80,
     attack: 100,
@@ -848,7 +848,7 @@ const Cerberus: BlastData = { // Cerberus
     nextEvolution: null,
     catchRate: 45,
     expYield: 255,
-    rarity: Rarity.LEGENDARY,
+    rarity: Rarity.Legendary,
 };
 
 const blastPedia: BlastData[] = [

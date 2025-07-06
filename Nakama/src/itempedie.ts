@@ -30,42 +30,42 @@ const potionData: ItemData = { // healthPotionData
     id: 0,
     behaviour: ITEM_BEHAVIOUR.HEAL,
     gain_amount: 20,
-    rarity: Rarity.COMMON,
+    rarity: Rarity.Common,
 };
 
 const superPotionData: ItemData = { // superHealthPotionData
     id: 1,
     behaviour: ITEM_BEHAVIOUR.HEAL,
     gain_amount: 50,
-    rarity:Rarity.UNCOMMON,
+    rarity:Rarity.Uncommon,
 };
 
 const hyperPotionData: ItemData = { // hyperHealthPotionData
     id: 2,
     behaviour: ITEM_BEHAVIOUR.HEAL,
     gain_amount: 200,
-    rarity:Rarity.RARE,
+    rarity:Rarity.Rare,
 };
 
 const elixirData: ItemData = { // manaPotionData
     id: 3,
     behaviour: ITEM_BEHAVIOUR.MANA,
     gain_amount: 10,
-    rarity:Rarity.COMMON,
+    rarity:Rarity.Common,
 };
 
 const superElixirData: ItemData = { // superManaPotionData
     id: 4,
     behaviour: ITEM_BEHAVIOUR.MANA,
     gain_amount: 25,
-    rarity:Rarity.UNCOMMON,
+    rarity:Rarity.Uncommon,
 };
 
 const hyperElixirData: ItemData = { // hyperManaPotionData
     id: 5,
     behaviour: ITEM_BEHAVIOUR.MANA,
     gain_amount: 50,
-    rarity:Rarity.RARE,
+    rarity:Rarity.Rare,
 };
 
 const blastTrapData: ItemData = { // blastTrapData
@@ -73,7 +73,7 @@ const blastTrapData: ItemData = { // blastTrapData
     behaviour: ITEM_BEHAVIOUR.CATCH,
     gain_amount: 0,
     catchRate: 1,
-    rarity:Rarity.COMMON,
+    rarity:Rarity.Common,
 };
 
 const superBlastTrapData: ItemData = { // superBlastTrapData
@@ -81,7 +81,7 @@ const superBlastTrapData: ItemData = { // superBlastTrapData
     behaviour: ITEM_BEHAVIOUR.CATCH,
     gain_amount: 0,
     catchRate: 1.5,
-    rarity:Rarity.COMMON,
+    rarity:Rarity.Common,
 };
 
 const hyperBlastTrapData: ItemData = { // hyperBlastTrapData
@@ -89,7 +89,7 @@ const hyperBlastTrapData: ItemData = { // hyperBlastTrapData
     behaviour: ITEM_BEHAVIOUR.CATCH,
     gain_amount: 0,
     catchRate: 2,
-    rarity:Rarity.COMMON,
+    rarity:Rarity.Common,
 };
 
 const AntiBurnData: ItemData = { // hyperBlastTrapData
@@ -97,7 +97,7 @@ const AntiBurnData: ItemData = { // hyperBlastTrapData
     behaviour: ITEM_BEHAVIOUR.STATUS,
     gain_amount: 0,
     status: Status.Burn,
-    rarity:Rarity.COMMON,
+    rarity:Rarity.Common,
 };
 
 const AntiSeededData: ItemData = { // hyperBlastTrapData
@@ -105,7 +105,7 @@ const AntiSeededData: ItemData = { // hyperBlastTrapData
     behaviour: ITEM_BEHAVIOUR.STATUS,
     gain_amount: 0,
     status: Status.Seeded,
-    rarity:Rarity.COMMON,
+    rarity:Rarity.Common,
 };
 
 const AntiWetData: ItemData = { // hyperBlastTrapData
@@ -113,7 +113,7 @@ const AntiWetData: ItemData = { // hyperBlastTrapData
     behaviour: ITEM_BEHAVIOUR.STATUS,
     gain_amount: 0,
     status: Status.Wet,
-    rarity:Rarity.COMMON,
+    rarity:Rarity.Common,
 };
 
 const itemPedia: ItemData[] = [

@@ -124,26 +124,26 @@ enum MoveEffect {
 }
 
 enum Rarity {
-    NONE,
-    COMMON,
-    UNCOMMON,
-    RARE,
-    EPIC,
-    LEGENDARY,
-    ULTIMATE,
-    UNIQUE,
+    None,
+    Common,
+    Uncommon,
+    Rare,
+    Epic,
+    Legendary,
+    Ultimate,
+    Unique,
 }
 
 enum Type {
-    NORMAL,
-    FIRE,
-    WATER,
-    GRASS,
-    GROUND,
-    FLY,
-    ELECTRIC,
-    LIGHT,
-    DARK
+    Normal = 0,
+    Fire = 1,
+    Water = 2,
+    Grass = 3,
+    Ground = 4,
+    Fly = 5,
+    Electric = 6,
+    Light = 7,
+    Dark = 8
 }
 
 enum Meteo {

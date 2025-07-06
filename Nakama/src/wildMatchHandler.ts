@@ -763,7 +763,7 @@ function connectedPlayers(s: WildBattleData): number {
 }
 
 //#region  Attack Logic
-function applyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Move, meteo: Meteo): number {
+function applyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Move, meteo: Meteo, logger: nkruntime.Logger): number {
     let damage = calculateDamage(
         calculateLevelFromExperience(attacker.exp),
         attacker.attack * getModifierMultiplier(Stats.Attack, attacker.modifiers),
@@ -772,6 +772,7 @@ function applyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Mo
         getBlastDataById(defender.data_id!).type,
         move.power,
         meteo,
+        logger
     );
 
     defender.hp = clamp(defender.hp - damage, 0, Number.POSITIVE_INFINITY);
@@ -794,7 +795,7 @@ interface AttackContext {
     isPlayer: boolean;
 }
 
-function executeAttack(ctx: AttackContext): void {
+function executeAttack(ctx: AttackContext,logger: nkruntime.Logger): void {
     // Gestion mana/plateforme
     switch (ctx.move.attackType) {
         case AttackType.Normal:
@@ -830,14 +831,16 @@ function executeAttack(ctx: AttackContext): void {
             ctx.attacker,
             ctx.defender,
             ctx.move,
-            ctx.meteo
+            ctx.meteo,
+            logger
         );
         ctx.setMoveDamage(damage);
     }
 } function executePlayerAttack(
     state: WildBattleData,
     move: Move,
-    dispatcher: nkruntime.MatchDispatcher
+    dispatcher: nkruntime.MatchDispatcher,
+    logger: nkruntime.Logger
 ): { state: WildBattleData } {
     const playerIndex = state.p1_index;
     executeAttack({
@@ -853,7 +856,7 @@ function executeAttack(ctx: AttackContext): void {
         meteo: state.meteo,
         dispatcher,
         isPlayer: true,
-    });
+    }, logger);
     return { state };
 }
 
@@ -929,13 +932,13 @@ function executeWildBlastAttack(
         meteo: state.meteo,
         dispatcher,
         isPlayer: false,
-    });
+    }, logger);
     state.turnStateData.wb_turn_type = TurnType.ATTACK;
     return { state };
 }
 
 function handleAttackTurn(isPlayerFaster: boolean, state: WildBattleData, move: Move, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): { state: WildBattleData } {
-    ({ state } = isPlayerFaster ? executePlayerAttack(state, move, dispatcher) : executeWildBlastAttack(state, dispatcher, logger));
+    ({ state } = isPlayerFaster ? executePlayerAttack(state, move, dispatcher, logger) : executeWildBlastAttack(state, dispatcher, logger));
 
     state = checkIfMatchContinue(state);
 

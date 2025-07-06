@@ -4,16 +4,27 @@ function rpcCalculateAttackDamage(context: nkruntime.Context, logger: nkruntime.
         throw new Error("User not authenticated");
     }
 
-    const params: CalculateDamageParams = JSON.parse(payload);
+    const raw = JSON.parse(payload);
 
-    var result:number = calculateDamage(
-        params.attackerLevel, 
-        params.attackerAttack, 
-        params.defenderDefense, 
-        params.attackType, 
-        params.defenderType, 
-        params.movePower, 
-        params.meteo
+    const params: CalculateDamageParams = {
+        attackerLevel: raw.attackerLevel,
+        attackerAttack: raw.attackerAttack,
+        defenderDefense: raw.defenderDefense,
+        attackType: parseEnum<Type>(raw.attackType, Type),
+        defenderType: parseEnum<Type>(raw.defenderType, Type),
+        movePower: raw.movePower,
+        meteo: parseEnum<Meteo>(raw.meteo, Meteo),
+    };
+
+    var result = calculateDamage(
+        params.attackerLevel,
+        params.attackerAttack,
+        params.defenderDefense,
+        params.attackType,
+        params.defenderType,
+        params.movePower,
+        params.meteo,
+        logger
     );
 
     return JSON.stringify(result);

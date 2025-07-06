@@ -79,6 +79,9 @@ let InitModule: nkruntime.InitModule = function (ctx: nkruntime.Context, logger:
     // User
     initializer.registerRpc('deleteAccount', rpcDeleteAccount);
 
+    // Tests
+    initializer.registerRpc('calculateAttackDamage', rpcCalculateAttackDamage);
+
     logger.info('XXXXXXXXXXXXXXXXXXXX - Blast Royale TypeScript loaded - XXXXXXXXXXXXXXXXXXXX');
 }
 

@@ -39,3 +39,124 @@ interface CalculateDamageParams {
     movePower: number;
     meteo: Meteo;
 }
+
+function rpcCalculateExpGain(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    const userId = context.userId;
+    if (!userId) {
+        throw new Error("User not authenticated");
+    }
+
+    const raw = JSON.parse(payload);
+
+    const params: ExpGainParams = {
+        expYield: raw.expYield,
+        enemyLevel: raw.enemyLevel,
+        yourLevel: raw.yourLevel,
+    };
+
+    var result = calculateExperienceGain(
+        params.expYield,
+        params.enemyLevel,
+        params.yourLevel,
+    );
+
+    return JSON.stringify(result);
+}
+
+interface ExpGainParams {
+    expYield: number;
+    enemyLevel: number;
+    yourLevel: number;
+}
+
+function rpcCalculateLevelFromExp(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    const userId = context.userId;
+    if (!userId) {
+        throw new Error("User not authenticated");
+    }
+
+    const raw: number = JSON.parse(payload);
+
+    var result = calculateLevelFromExperience(raw);
+
+    return JSON.stringify(result);
+}
+
+function rpcCalculateExpFromLevel(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    const userId = context.userId;
+    if (!userId) {
+        throw new Error("User not authenticated");
+    }
+
+    const raw: number = JSON.parse(payload);
+
+    var result = calculateExperienceFromLevel(raw);
+
+    return JSON.stringify(result);
+}
+
+
+
+function rpcCalculateBlastStat(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    const userId = context.userId;
+    if (!userId) {
+        throw new Error("User not authenticated");
+    }
+
+    const raw = JSON.parse(payload);
+
+    const params: BaseStats = {
+        baseStat: raw.baseStat,
+        iv: raw.iv,
+        level: raw.level,
+    };
+
+    var result = calculateBlastStat(params.baseStat, params.iv, params.level);
+
+    return JSON.stringify(result);
+}
+
+function rpcCalculateBlastHP(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    const userId = context.userId;
+    if (!userId) {
+        throw new Error("User not authenticated");
+    }
+
+    const raw = JSON.parse(payload);
+
+    const params: BaseStats = {
+        baseStat: raw.baseStat,
+        iv: raw.iv,
+        level: raw.level,
+    };
+
+    var result = calculateBlastHp(params.baseStat, params.iv, params.level);
+
+    return JSON.stringify(result);
+}
+
+function rpcCalculateBlastMana(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
+    const userId = context.userId;
+    if (!userId) {
+        throw new Error("User not authenticated");
+    }
+
+    const raw = JSON.parse(payload);
+
+    const params: BaseStats = {
+        baseStat: raw.baseStat,
+        iv: raw.iv,
+        level: raw.level,
+    };
+
+    var result = calculateBlastMana(params.baseStat, params.iv, params.level);
+
+    return JSON.stringify(result);
+}
+
+
+interface BaseStats {
+    baseStat: number;
+    iv: number;
+    level: number;
+}

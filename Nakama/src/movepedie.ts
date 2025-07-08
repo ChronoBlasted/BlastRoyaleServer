@@ -714,7 +714,7 @@ const Spore: Move = {
     id: 313,
     type: Type.Grass,
     attackType: AttackType.Status,
-    target: Target.Self,
+    target: Target.Opponent,
     power: 0,
     cost: 10,
     priority: 0,

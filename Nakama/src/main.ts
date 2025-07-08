@@ -81,6 +81,15 @@ let InitModule: nkruntime.InitModule = function (ctx: nkruntime.Context, logger:
 
     // Tests
     initializer.registerRpc('calculateAttackDamage', rpcCalculateAttackDamage);
+    
+    initializer.registerRpc('calculateExpGain', rpcCalculateExpGain);
+    initializer.registerRpc('calculateLevelFromExp', rpcCalculateLevelFromExp);
+    initializer.registerRpc('calculateExpFromLevel', rpcCalculateExpFromLevel);
+
+    initializer.registerRpc('calculateBlastStat', rpcCalculateBlastStat);
+    initializer.registerRpc('calculateBlastHP', rpcCalculateBlastHP);
+    initializer.registerRpc('calculateBlastMana', rpcCalculateBlastMana);
+    
 
     logger.info('XXXXXXXXXXXXXXXXXXXX - Blast Royale TypeScript loaded - XXXXXXXXXXXXXXXXXXXX');
 }

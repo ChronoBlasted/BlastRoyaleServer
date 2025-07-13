@@ -6,6 +6,12 @@ enum Currency {
   Hard = "Hard",
 };
 
+enum notificationOpCodes {
+    CURENCY = 1000,
+    BLAST = 1010,
+    ITEM = 1020,
+}
+
 let DefaultWallet = {
   [Currency.Coins]: 1000,
   [Currency.Gems]: 100,

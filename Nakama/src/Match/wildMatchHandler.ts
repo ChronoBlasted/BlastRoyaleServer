@@ -766,8 +766,8 @@ function connectedPlayers(s: WildBattleData): number {
 function applyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Move, meteo: Meteo, logger: nkruntime.Logger): number {
     let damage = calculateDamage(
         calculateLevelFromExperience(attacker.exp),
-        attacker.attack * getModifierMultiplier(Stats.Attack, attacker.modifiers),
-        defender.defense * getModifierMultiplier(Stats.Defense, defender.modifiers),
+        attacker.attack * getStatModifier(Stats.Attack, attacker.modifiers),
+        defender.defense * getStatModifier(Stats.Defense, defender.modifiers),
         move.type,
         getBlastDataById(defender.data_id!).type,
         move.power,

@@ -1,70 +1,14 @@
 // region Setup 
 
-enum BattleState {
-    NONE,
-    WAITING,
-    READY,
-    START,
-    WAITFORPLAYERSWAP,
-    WAITFORPLAYERCHOOSEOFFER,
-    END,
-}
+interface PvEBattleData extends BattleData {
 
-enum PlayerState {
-    NONE,
-    BUSY,
-    READY,
-}
-
-enum TurnType {
-    NONE,
-    ATTACK,
-    ITEM,
-    SWAP,
-    WAIT
-}
-
-interface WildBattleData {
-    emptyTicks: number
-
-    presences: { [userId: string]: nkruntime.Presence | null }
-
-    battle_state: BattleState;
-
-    player1_state: PlayerState;
-    player1_id: string;
-
-    p1_index: number;
-    p1_blasts: BlastEntity[];
-    player1_items: Item[];
-    player1_platform: Type[];
-
-    wild_blast: BlastEntity | null;
-    wild_blast_platform: Type[];
+    turnStateData: WildTurnStateData;
 
     index_progression: number;
     blast_defeated: number;
     blast_catched: number;
 
-    meteo: Meteo
-
-    turnStateData: TurnStateData;
     offerTurnStateData: OfferTurnStateData;
-}
-
-interface StartStateData {
-    newBlastData: NewBlastData;
-    meteo: Meteo;
-}
-
-interface NewBlastData {
-    id: number;
-    exp: number;
-    iv: number;
-    boss: boolean;
-    shiny: boolean;
-    status: Status;
-    activeMoveset: number[];
 }
 
 interface OfferTurnStateData {
@@ -73,26 +17,18 @@ interface OfferTurnStateData {
     offer_three: Offer;
 }
 
-interface TurnStateData {
-    p_move_damage: number;
-    p_move_effects: MoveEffectData[];
-
-    wb_turn_type: TurnType;
-    wb_move_index: number;
-    wb_move_damage: number;
-    wb_move_effects: MoveEffectData[];
-
+interface WildTurnStateData extends TurnStateData {
     catched: boolean;
 }
 
-function rpcFindOrCreateWildBattle(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
+function rpcCreatePvEBattle(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
     var matchId = nk.matchCreate('wildBattle', {});
     return JSON.stringify(matchId);
 }
 
-const matchInit = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, params: { [key: string]: string }): { state: WildBattleData, tickRate: number, label: string } {
+const PvEinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, params: { [key: string]: string }): { state: PvEBattleData, tickRate: number, label: string } {
 
-    const wildBattleData: WildBattleData = {
+    const PvEBattleData: PvEBattleData = {
         emptyTicks: 0,
         presences: {},
         battle_state: BattleState.START,
@@ -100,13 +36,18 @@ const matchInit = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
         player1_state: PlayerState.BUSY,
         player1_id: "",
 
+        player2_state: PlayerState.BUSY,
+        player2_id: "",
+
         p1_index: 0,
         p1_blasts: [],
         player1_items: [],
         player1_platform: [],
 
-        wild_blast: null,
-        wild_blast_platform: [],
+        p2_index: 0,
+        p2_blasts: [],
+        player2_items: [],
+        player2_platform: [],
 
         index_progression: 1,
         blast_defeated: 0,
@@ -115,13 +56,13 @@ const matchInit = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
         meteo: Meteo.None,
 
         turnStateData: {
-            p_move_damage: 0,
-            p_move_effects: [],
+            p1_move_damage: 0,
+            p1_move_effects: [],
 
-            wb_turn_type: TurnType.NONE,
-            wb_move_index: 0,
-            wb_move_damage: 0,
-            wb_move_effects: [],
+            p2_turn_type: TurnType.NONE,
+            p2_move_index: 0,
+            p2_move_damage: 0,
+            p2_move_effects: [],
 
             catched: false
         },
@@ -152,14 +93,14 @@ const matchInit = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
     };
 
     return {
-        state: wildBattleData,
+        state: PvEBattleData,
         tickRate: 2, // 1 tick per second = 1 MatchLoop func invocations per second
         label: ''
     };
 };
 
 
-const matchJoinAttempt = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: WildBattleData, presence: nkruntime.Presence, metadata: { [key: string]: any }): { state: WildBattleData, accept: boolean, rejectMessage?: string | undefined } | null {
+const PvEmatchJoinAttempt = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvEBattleData, presence: nkruntime.Presence, metadata: { [key: string]: any }): { state: PvEBattleData, accept: boolean, rejectMessage?: string | undefined } | null {
     logger.debug('%q attempted to join Lobby match', ctx.userId);
 
     return {
@@ -168,7 +109,7 @@ const matchJoinAttempt = function (ctx: nkruntime.Context, logger: nkruntime.Log
     };
 }
 
-const matchJoin = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: WildBattleData, presences: nkruntime.Presence[]): { state: WildBattleData } | null {
+const PvEmatchJoin = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvEBattleData, presences: nkruntime.Presence[]): { state: PvEBattleData } | null {
     for (const presence of presences) {
         state.emptyTicks = 0;
         state.presences[presence.userId] = presence;
@@ -179,15 +120,19 @@ const matchJoin = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
     };
 }
 
-// region Leave 
-
-const matchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: WildBattleData, presences: nkruntime.Presence[]): { state: WildBattleData } | null {
+const PvEmatchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvEBattleData, presences: nkruntime.Presence[]): { state: PvEBattleData } | null {
     for (let presence of presences) {
         logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
 
         if (state.player1_id == presence.userId) {
 
-            PlayerLeave(nk, state, logger);
+            PvEPlayerLeave(nk, state, logger);
+            dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
+        }
+
+        if (state.player2_id == presence.userId) {
+
+            PvEPlayerLeave(nk, state, logger);
             dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
         }
 
@@ -199,8 +144,7 @@ const matchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger, n
             delete state.presences[userID];
         }
     }
-
-    if (connectedPlayers(state) === 0) {
+    if (ConnectedPlayers(state) === 0) {
         return null;
     }
 
@@ -209,10 +153,9 @@ const matchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger, n
     };
 }
 
-
 // region MatchLoop 
 
-const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: WildBattleData, messages: nkruntime.MatchMessage[]): { state: WildBattleData } | null {
+const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvEBattleData, messages: nkruntime.MatchMessage[]): { state: PvEBattleData } | null {
 
     switch (state.battle_state) {
         case BattleState.START:
@@ -233,28 +176,28 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
 
             logger.debug('______________ CREAT NEW BLAST ______________');
             var newBlast = GetNewWildBlast(state, nk, logger);
-            logger.debug('______________ FIND NEW BLAST ______________');
 
-            state.wild_blast = ConvertBlastToBlastEntity(newBlast);
+            state.p2_index = 0;
+            state.p2_blasts = [ConvertBlastToBlastEntity(newBlast)];
 
             const newWildBlast: NewBlastData = {
-                id: state.wild_blast.data_id,
-                exp: state.wild_blast.exp,
-                iv: state.wild_blast.iv,
-                boss: state.wild_blast.boss,
-                shiny: state.wild_blast.shiny,
-                activeMoveset: state.wild_blast.activeMoveset,
+                id: state.p2_blasts[state.p2_index].data_id,
+                exp: state.p2_blasts[state.p2_index].exp,
+                iv: state.p2_blasts[state.p2_index].iv,
+                boss: state.p2_blasts[state.p2_index].boss,
+                shiny: state.p2_blasts[state.p2_index].shiny,
+                activeMoveset: state.p2_blasts[state.p2_index].activeMoveset,
                 status: Status.None
             }
 
             state.meteo = getRandomMeteo();
 
             const StartData: StartStateData = {
-                newBlastData: newWildBlast,
+                newBlastData: [newWildBlast],
                 meteo: state.meteo,
             }
 
-            logger.debug('Random blast with id: %d, lvl: %l appeared', state.wild_blast.data_id, calculateLevelFromExperience(state.wild_blast.exp));
+            logger.debug('Random blast with id: %d, lvl: %l appeared', state.p2_blasts[state.p2_index].data_id, calculateLevelFromExperience(state.p2_blasts[state.p2_index].exp));
 
             state.battle_state = BattleState.WAITING;
 
@@ -309,14 +252,14 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                 state.player1_state = PlayerState.BUSY;
 
                 state.turnStateData = {
-                    p_move_damage: 0,
-                    p_move_effects: [],
+                    p1_move_damage: 0,
+                    p1_move_effects: [],
 
-                    wb_move_index: getRandomUsableMove(getMovesByIds(state.wild_blast!.activeMoveset!), state.wild_blast!.mana, state.wild_blast_platform),
-                    wb_move_damage: 0,
-                    wb_move_effects: [],
+                    p2_move_index: getRandomUsableMove(getMovesByIds(state.p2_blasts![state.p2_index].activeMoveset!), state.p2_blasts![state.p2_index].mana, state.player2_platform),
+                    p2_move_damage: 0,
+                    p2_move_effects: [],
 
-                    wb_turn_type: TurnType.NONE,
+                    p2_turn_type: TurnType.NONE,
 
                     catched: false
                 }
@@ -369,7 +312,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                             case ITEM_BEHAVIOUR.CATCH:
                                 var wildBlastCaptured = false;
 
-                                wildBlastCaptured = isBlastCaptured(state.wild_blast!.hp, state.wild_blast!.maxHp, getBlastDataById(state.wild_blast!.data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
+                                wildBlastCaptured = isBlastCaptured(state.p2_blasts![state.p2_index].hp, state.p2_blasts![state.p2_index].maxHp, getBlastDataById(state.p2_blasts![state.p2_index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
 
                                 if (wildBlastCaptured) {
                                     logger.debug('Wild blast Captured !', wildBlastCaptured);
@@ -412,7 +355,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                         break;
 
                     case OpCodes.PLAYER_LEAVE:
-                        PlayerLeave(nk, state, logger);
+                        PvEPlayerLeave(nk, state, logger);
                         dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
 
                         return null;
@@ -420,13 +363,13 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
 
                 // region End turn Logic
 
-                ({ blast: state.p1_blasts[state.p1_index]!, otherBlast: state.wild_blast! } = applyStatusEffectAtEndOfTurn(state.p1_blasts[state.p1_index]!, state.wild_blast!));
-                ({ blast: state.wild_blast!, otherBlast: state.p1_blasts[state.p1_index]! } = applyStatusEffectAtEndOfTurn(state.wild_blast!, state.p1_blasts[state.p1_index]!));
+                ({ blast: state.p1_blasts[state.p1_index]!, otherBlast: state.p2_blasts![state.p2_index] } = applyStatusEffectAtEndOfTurn(state.p1_blasts[state.p1_index]!, state.p2_blasts![state.p2_index]));
+                ({ blast: state.p2_blasts![state.p2_index], otherBlast: state.p1_blasts[state.p1_index]! } = applyStatusEffectAtEndOfTurn(state.p2_blasts![state.p2_index], state.p1_blasts[state.p1_index]!));
 
                 state = checkIfMatchContinue(state);
 
                 if (state.battle_state == BattleState.END) {
-                    if (isBlastAlive(state.wild_blast!)) state.wild_blast!.mana = calculateManaRecovery(state.wild_blast!.maxMana, state.wild_blast!.mana, false);
+                    if (isBlastAlive(state.p2_blasts![state.p2_index])) state.p2_blasts![state.p2_index].mana = calculateManaRecovery(state.p2_blasts![state.p2_index].maxMana, state.p2_blasts![state.p2_index].mana, false);
                     if (isBlastAlive(state.p1_blasts[state.p1_index]!)) state.p1_blasts[state.p1_index]!.mana = calculateManaRecovery(state.p1_blasts[state.p1_index]!.maxMana, state.p1_blasts[state.p1_index]!.mana, false);
 
                     dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
@@ -434,7 +377,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                     return;
                 }
                 else if (state.battle_state == BattleState.WAITFORPLAYERSWAP) {
-                    state.wild_blast!.mana = calculateManaRecovery(state.wild_blast!.maxMana, state.wild_blast!.mana, false);
+                    state.p2_blasts![state.p2_index].mana = calculateManaRecovery(state.p2_blasts![state.p2_index].maxMana, state.p2_blasts![state.p2_index].mana, false);
 
                     dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
 
@@ -446,7 +389,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                     state.battle_state = BattleState.WAITING;
 
                     state.p1_blasts[state.p1_index]!.mana = calculateManaRecovery(state.p1_blasts[state.p1_index]!.maxMana, state.p1_blasts[state.p1_index]!.mana, false);
-                    state.wild_blast!.mana = calculateManaRecovery(state.wild_blast!.maxMana, state.wild_blast!.mana, false);
+                    state.p2_blasts![state.p2_index].mana = calculateManaRecovery(state.p2_blasts![state.p2_index].maxMana, state.p2_blasts![state.p2_index].mana, false);
 
                     //Send matchTurn
                     dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
@@ -495,7 +438,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                 state.battle_state = BattleState.WAITING;
 
                 logger.debug('______________ END PLAYER SWAP BLAST ______________');
-                logger.debug('Wild blast HP : %h, Mana : %m', state.wild_blast?.hp, state.wild_blast?.mana);
+                logger.debug('Wild blast HP : %h, Mana : %m', state.p2_blasts![state.p2_index].hp, state.p2_blasts![state.p2_index].mana);
                 logger.debug('Player blast HP : %h, Mana : %m', state.p1_blasts[state.p1_index]?.hp, state.p1_blasts[state.p1_index]?.mana);
             });
             break;
@@ -553,12 +496,12 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                         case OfferType.COINS:
                             updateWalletWithCurrency(nk, state.player1_id, Currency.Coins, currentOffer.coinsAmount);
 
-                            if (getMetadataStat(nk, state.player1_id, "wildBattleButtonAds")) updateWalletWithCurrency(nk, state.player1_id, Currency.Coins, currentOffer.coinsAmount / 2)
+                            if (getMetadataStat(nk, state.player1_id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1_id, Currency.Coins, currentOffer.coinsAmount / 2)
                             break;
                         case OfferType.GEMS:
                             updateWalletWithCurrency(nk, state.player1_id, Currency.Gems, currentOffer.gemsAmount);
 
-                            if (getMetadataStat(nk, state.player1_id, "wildBattleButtonAds")) updateWalletWithCurrency(nk, state.player1_id, Currency.Gems, currentOffer.gemsAmount / 2)
+                            if (getMetadataStat(nk, state.player1_id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1_id, Currency.Gems, currentOffer.gemsAmount / 2)
                             break;
                         case OfferType.NONE:
                             break;
@@ -566,15 +509,15 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
 
                     var newBlast = GetNewWildBlast(state, nk, logger);
 
-                    state.wild_blast = ConvertBlastToBlastEntity(newBlast);
+                    state.p2_blasts = [ConvertBlastToBlastEntity(newBlast)];
 
                     const newWildBlast: NewBlastData = {
-                        id: state.wild_blast.data_id,
-                        exp: state.wild_blast.exp,
-                        iv: state.wild_blast.iv,
-                        boss: state.wild_blast.boss,
-                        shiny: state.wild_blast.shiny,
-                        activeMoveset: state.wild_blast.activeMoveset,
+                        id: state.p2_blasts[state.p2_index].data_id,
+                        exp: state.p2_blasts[state.p2_index].exp,
+                        iv: state.p2_blasts[state.p2_index].iv,
+                        boss: state.p2_blasts[state.p2_index].boss,
+                        shiny: state.p2_blasts[state.p2_index].shiny,
+                        activeMoveset: state.p2_blasts[state.p2_index].activeMoveset,
                         status: Status.None
                     }
 
@@ -591,23 +534,23 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
         case BattleState.END:
 
             const playerBlast = state.p1_blasts[state.p1_index]!;
-            const wildBlast = state.wild_blast!;
+            const wildBlast = state.p2_blasts!;
             const allPlayerBlastFainted = isAllBlastDead(state.p1_blasts);
 
-            const wildAlive = isBlastAlive(wildBlast);
+            const wildAlive = isBlastAlive(wildBlast[state.p2_index]);
 
             if (wildAlive == false || state.turnStateData.catched) {
 
                 state.index_progression++;
 
-                addExpOnBlastInGame(nk, logger, state.player1_id, playerBlast, wildBlast);
+                addExpOnBlastInGame(nk, logger, state.player1_id, playerBlast, wildBlast[state.p2_index]);
 
                 if (state.turnStateData.catched) {
                     state.blast_catched++;
 
                     incrementQuest(state.player1_id, QuestIds.CATCH_BLAST, 1, nk, logger);
 
-                    addBlast(nk, logger, state.player1_id, state.wild_blast!);
+                    addBlast(nk, logger, state.player1_id, state.p2_blasts![state.p2_index]);
                 }
                 else {
                     state.blast_defeated++;
@@ -638,15 +581,15 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
                         newBlast.iv = MaxIV;
                     };
 
-                    state.wild_blast = ConvertBlastToBlastEntity(newBlast);
+                    state.p2_blasts = [ConvertBlastToBlastEntity(newBlast)];
 
                     const newWildBlast: NewBlastData = {
-                        id: state.wild_blast.data_id,
-                        exp: state.wild_blast.exp,
-                        iv: state.wild_blast.iv,
-                        boss: state.wild_blast.boss,
-                        shiny: state.wild_blast.shiny,
-                        activeMoveset: state.wild_blast.activeMoveset,
+                        id: state.p2_blasts[state.p2_index].data_id,
+                        exp: state.p2_blasts[state.p2_index].exp,
+                        iv: state.p2_blasts[state.p2_index].iv,
+                        boss: state.p2_blasts[state.p2_index].boss,
+                        shiny: state.p2_blasts[state.p2_index].shiny,
+                        activeMoveset: state.p2_blasts[state.p2_index].activeMoveset,
                         status: Status.None
                     }
 
@@ -660,7 +603,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
             }
             else if (allPlayerBlastFainted) {
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false));
-                PlayerLeave(nk, state, logger);
+                PvEPlayerLeave(nk, state, logger);
 
                 return null;
             }
@@ -671,7 +614,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
     }
 
 
-    if (connectedPlayers(state) === 0) {
+    if (ConnectedPlayers(state) === 0) {
         logger.debug('Running empty ticks: %d', state.emptyTicks);
         state.emptyTicks++;
     }
@@ -685,7 +628,7 @@ const matchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk
     };
 }
 
-const matchSignal = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: WildBattleData, data: string): { state: WildBattleData, data?: string } | null {
+const PvEmatchSignal = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvEBattleData, data: string): { state: PvEBattleData, data?: string } | null {
     logger.debug('Lobby match signal received: ' + data);
 
     return {
@@ -694,7 +637,7 @@ const matchSignal = function (ctx: nkruntime.Context, logger: nkruntime.Logger, 
     };
 }
 
-const matchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: WildBattleData, graceSeconds: number): { state: WildBattleData } | null {
+const PvEmatchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvEBattleData, graceSeconds: number): { state: PvEBattleData } | null {
     logger.debug('Lobby match terminated');
 
     return {
@@ -703,8 +646,8 @@ const matchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Logge
 }
 
 
-function PlayerLeave(nk: nkruntime.Nakama, state: WildBattleData, logger: nkruntime.Logger) {
-    let bonusAds = getMetadataStat(nk, state.player1_id, "wildBattleButtonAds");
+function PvEPlayerLeave(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkruntime.Logger) {
+    let bonusAds = getMetadataStat(nk, state.player1_id, "pveBattleButtonAds");
 
     if (state.blast_catched > 0) {
         incrementMetadataStat(nk, state.player1_id, "blast_catched", state.blast_catched);
@@ -728,22 +671,16 @@ function PlayerLeave(nk: nkruntime.Nakama, state: WildBattleData, logger: nkrunt
     }
 
     if (bonusAds) {
-        setMetadataStat(nk, state.player1_id, "wildBattleButtonAds", false);
+        setMetadataStat(nk, state.player1_id, "pveBattleButtonAds", false);
     }
 }
 
-function GetNewWildBlast(state: WildBattleData, nk: nkruntime.Nakama, logger: nkruntime.Logger): Blast {
+function GetNewWildBlast(state: PvEBattleData, nk: nkruntime.Nakama, logger: nkruntime.Logger): Blast {
     return getRandomBlastWithAreaId(state.player1_id, nk, Math.floor(state.index_progression / 5), state.index_progression % 10 == 0, logger);
 }
 
-function EndLoopDebug(logger: nkruntime.Logger, state: WildBattleData) {
-    logger.debug('______________ END LOOP BATTLE ______________');
-    logger.debug('Wild blast HP : %h, Mana : %m', state.wild_blast?.hp, state.wild_blast?.mana);
-    logger.debug('Player blast HP : %h, Mana : %m', state.p1_blasts[state.p1_index]?.hp, state.p1_blasts[state.p1_index]?.mana);
-    logger.debug('Wild blast turn type : %h', state.turnStateData.wb_turn_type);
-}
 
-function ErrorFunc(state: WildBattleData, error: string, dispatcher: nkruntime.MatchDispatcher, currentBattleState: BattleState) {
+function ErrorFunc(state: PvEBattleData, error: string, dispatcher: nkruntime.MatchDispatcher, currentBattleState: BattleState) {
     state.battle_state = currentBattleState;
     state.player1_state = PlayerState.READY;
 
@@ -752,7 +689,7 @@ function ErrorFunc(state: WildBattleData, error: string, dispatcher: nkruntime.M
     return { state };
 }
 
-function connectedPlayers(s: WildBattleData): number {
+function ConnectedPlayers(s: BattleData): number {
     let count = 0;
     for (const p of Object.keys(s.presences)) {
         if (s.presences[p] !== null) {
@@ -763,7 +700,7 @@ function connectedPlayers(s: WildBattleData): number {
 }
 
 //#region  Attack Logic
-function applyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Move, meteo: Meteo, logger: nkruntime.Logger): number {
+function ApplyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Move, meteo: Meteo, logger: nkruntime.Logger): number {
     let damage = calculateDamage(
         calculateLevelFromExperience(attacker.exp),
         attacker.attack * getStatModifier(Stats.Attack, attacker.modifiers),
@@ -795,7 +732,7 @@ interface AttackContext {
     isPlayer: boolean;
 }
 
-function executeAttack(ctx: AttackContext,logger: nkruntime.Logger): void {
+function ExecuteAttack(ctx: AttackContext, logger: nkruntime.Logger): void {
     // Gestion mana/plateforme
     switch (ctx.move.attackType) {
         case AttackType.Normal:
@@ -816,7 +753,7 @@ function executeAttack(ctx: AttackContext,logger: nkruntime.Logger): void {
     }
 
     // Application des effets
-    const effects = applyMoveEffects(
+    const effects = ApplyMoveEffects(
         ctx.move,
         () => ctx.defender,
         ctx.setDefender,
@@ -827,7 +764,7 @@ function executeAttack(ctx: AttackContext,logger: nkruntime.Logger): void {
 
     // Application des dégâts
     if (ctx.move.target === Target.Opponent) {
-        const damage = applyBlastAttack(
+        const damage = ApplyBlastAttack(
             ctx.attacker,
             ctx.defender,
             ctx.move,
@@ -836,23 +773,27 @@ function executeAttack(ctx: AttackContext,logger: nkruntime.Logger): void {
         );
         ctx.setMoveDamage(damage);
     }
-} function executePlayerAttack(
-    state: WildBattleData,
+} 
+
+
+function executePlayerAttack(
+    state: PvEBattleData,
     move: Move,
     dispatcher: nkruntime.MatchDispatcher,
     logger: nkruntime.Logger
-): { state: WildBattleData } {
-    const playerIndex = state.p1_index;
-    executeAttack({
+): { state: PvEBattleData } {
+    const player1Index = state.p1_index;
+    const player2Index = state.p2_index;
+    ExecuteAttack({
         move,
-        attacker: state.p1_blasts[playerIndex]!,
-        defender: state.wild_blast!,
+        attacker: state.p1_blasts[player1Index]!,
+        defender: state.p2_blasts![player2Index],
         attackerPlatforms: state.player1_platform,
-        setAttacker: b => state.p1_blasts[playerIndex] = b,
-        setDefender: b => state.wild_blast = b,
+        setAttacker: b => state.p1_blasts[player1Index] = b,
+        setDefender: b => state.p2_blasts[player2Index] = b,
         getTurnStateData: () => state.turnStateData,
-        setMoveDamage: dmg => state.turnStateData.p_move_damage = dmg,
-        setMoveEffect: eff => state.turnStateData.p_move_effects = eff,
+        setMoveDamage: dmg => state.turnStateData.p1_move_damage = dmg,
+        setMoveEffect: eff => state.turnStateData.p1_move_effects = eff,
         meteo: state.meteo,
         dispatcher,
         isPlayer: true,
@@ -861,7 +802,7 @@ function executeAttack(ctx: AttackContext,logger: nkruntime.Logger): void {
 }
 
 
-function applyMoveEffects(
+function ApplyMoveEffects(
     move: Move,
     getTargetBlast: () => BlastEntity,
     setTargetBlast: (blast: BlastEntity) => void,
@@ -901,43 +842,43 @@ function applyMoveEffects(
 }
 
 function executeWildBlastAttack(
-    state: WildBattleData,
+    state: PvEBattleData,
     dispatcher: nkruntime.MatchDispatcher,
     logger: nkruntime.Logger
-): { state: WildBattleData } {
+): { state: PvEBattleData } {
 
-    const moveIndex = state.turnStateData.wb_move_index;
+    const moveIndex = state.turnStateData.p2_move_index;
     if (moveIndex === -1) {
-        state.wild_blast!.mana = calculateManaRecovery(
-            state.wild_blast!.maxMana,
-            state.wild_blast!.mana,
+        state.p2_blasts![state.p2_index].mana = calculateManaRecovery(
+            state.p2_blasts![state.p2_index].maxMana,
+            state.p2_blasts![state.p2_index].mana,
             true
         );
-        state.turnStateData.wb_turn_type = TurnType.WAIT;
+        state.turnStateData.p2_turn_type = TurnType.WAIT;
         return { state };
     }
 
-    const move = getMoveById(state.wild_blast!.activeMoveset![moveIndex]);
+    const move = getMoveById(state.p2_blasts![state.p2_index].activeMoveset![moveIndex]);
 
-    executeAttack({
+    ExecuteAttack({
         move,
-        attacker: state.wild_blast!,
+        attacker: state.p2_blasts![state.p2_index],
         defender: state.p1_blasts[state.p1_index]!,
-        attackerPlatforms: state.wild_blast_platform,
-        setAttacker: b => state.wild_blast = b,
+        attackerPlatforms: state.player2_platform,
+        setAttacker: b => state.p2_blasts![state.p2_index] = b,
         setDefender: b => state.p1_blasts[state.p1_index] = b,
         getTurnStateData: () => state.turnStateData,
-        setMoveDamage: dmg => state.turnStateData.wb_move_damage = dmg,
-        setMoveEffect: eff => state.turnStateData.wb_move_effects = eff,
+        setMoveDamage: dmg => state.turnStateData.p2_move_damage = dmg,
+        setMoveEffect: eff => state.turnStateData.p2_move_effects = eff,
         meteo: state.meteo,
         dispatcher,
         isPlayer: false,
     }, logger);
-    state.turnStateData.wb_turn_type = TurnType.ATTACK;
+    state.turnStateData.p2_turn_type = TurnType.ATTACK;
     return { state };
 }
 
-function handleAttackTurn(isPlayerFaster: boolean, state: WildBattleData, move: Move, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): { state: WildBattleData } {
+function handleAttackTurn(isPlayerFaster: boolean, state: PvEBattleData, move: Move, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): { state: PvEBattleData } {
     ({ state } = isPlayerFaster ? executePlayerAttack(state, move, dispatcher, logger) : executeWildBlastAttack(state, dispatcher, logger));
 
     state = checkIfMatchContinue(state);
@@ -945,16 +886,16 @@ function handleAttackTurn(isPlayerFaster: boolean, state: WildBattleData, move: 
     return { state };
 }
 
-function performAttackSequence(state: WildBattleData, playerMove: Move, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): WildBattleData {
+function performAttackSequence(state: PvEBattleData, playerMove: Move, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): PvEBattleData {
 
     let firstIsPlayer: boolean;
 
-    if (state.turnStateData.wb_move_index >= 0) {
-        const wildMoveId = state.wild_blast!.activeMoveset![state.turnStateData.wb_move_index];
+    if (state.turnStateData.p2_move_index >= 0) {
+        const wildMoveId = state.p2_blasts![state.p2_index].activeMoveset![state.turnStateData.p2_move_index];
         const wildMove = getMoveById(wildMoveId);
 
         if (playerMove.priority == wildMove.priority) {
-            firstIsPlayer = getFasterBlast(state.p1_blasts[state.p1_index]!, state.wild_blast!);
+            firstIsPlayer = getFasterBlast(state.p1_blasts[state.p1_index]!, state.p2_blasts![state.p2_index]);
         } else {
             firstIsPlayer = playerMove.priority > wildMove.priority;
         }
@@ -972,10 +913,10 @@ function performAttackSequence(state: WildBattleData, playerMove: Move, dispatch
     return state;
 }
 
-function checkIfMatchContinue(state: WildBattleData): WildBattleData {
+function checkIfMatchContinue(state: PvEBattleData): PvEBattleData {
 
     const playerBlast = state.p1_blasts[state.p1_index]!;
-    const wildBlast = state.wild_blast!;
+    const wildBlast = state.p2_blasts![state.p2_index];
 
     const wildAlive = isBlastAlive(wildBlast);
     const playerAlive = isBlastAlive(playerBlast);
@@ -996,7 +937,7 @@ function checkIfMatchContinue(state: WildBattleData): WildBattleData {
 //#endregion
 
 // region Offer Turn Logic
-function getRandomOffer(nk: nkruntime.Nakama, state: WildBattleData, logger: nkruntime.Logger): Offer {
+function getRandomOffer(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkruntime.Logger): Offer {
     let offer: Offer = {
         type: OfferType.ITEM,
         coinsAmount: 0,

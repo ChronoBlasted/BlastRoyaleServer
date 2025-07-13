@@ -63,20 +63,20 @@ let InitModule: nkruntime.InitModule = function (ctx: nkruntime.Context, logger:
     initializer.registerRpc('loadAllArea', rpcLoadAllArea);
 
     // Wild Battle
-    initializer.registerRpc('findWildBattle', rpcFindOrCreateWildBattle);
-    initializer.registerRpc('updateNicknameStatus', rpcUpdateNicknameStatus);
-
+    initializer.registerRpc('findWildBattle', rpcCreatePvEBattle);
+    
     initializer.registerMatch('wildBattle', {
-        matchInit,
-        matchJoinAttempt,
-        matchJoin,
-        matchLeave,
-        matchLoop,
-        matchSignal,
-        matchTerminate
+        matchInit: PvEinitMatch,
+        matchJoinAttempt: PvEmatchJoinAttempt,
+        matchJoin: PvEmatchJoin,
+        matchLeave: PvEmatchLeave,
+        matchLoop: PvEmatchLoop,
+        matchSignal: PvEmatchSignal,
+        matchTerminate: PvEmatchTerminate
     });
-
+    
     // User
+    initializer.registerRpc('updateNicknameStatus', rpcUpdateNicknameStatus);
     initializer.registerRpc('deleteAccount', rpcDeleteAccount);
 
     // Tests

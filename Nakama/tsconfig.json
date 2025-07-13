@@ -24,7 +24,8 @@
     
     "src/Match/opCode.ts",
     "src/Match/matchHelper.ts",
-    "src/Match/wildMatchHandler.ts",
+    "src/Match/pveMatchHandler.ts",
+    "src/Match/pvpMatchHandler.ts",
   ],
   "compilerOptions": {
     "target": "ES2017", /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */

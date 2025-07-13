@@ -1,6 +1,84 @@
 const healManaPerRound = 20;
 const healManaPerWait = 50;
 
+enum BattleState {
+    NONE,
+    WAITING,
+    READY,
+    START,
+    WAITFORPLAYERSWAP,
+    WAITFORPLAYERCHOOSEOFFER,
+    END,
+}
+
+enum PlayerState {
+    NONE,
+    BUSY,
+    READY,
+}
+
+enum TurnType {
+    NONE,
+    ATTACK,
+    ITEM,
+    SWAP,
+    WAIT
+}
+
+interface BattleData {
+    emptyTicks: number
+
+    presences: { [userId: string]: nkruntime.Presence | null }
+
+    battle_state: BattleState;
+
+
+    player1_state: PlayerState;
+    player1_id: string;
+
+    p1_index: number;
+    p1_blasts: BlastEntity[];
+    player1_items: Item[];
+    player1_platform: Type[];
+
+
+    player2_state: PlayerState;
+    player2_id: string;
+
+    p2_index: number;
+    p2_blasts: BlastEntity[];
+    player2_items: Item[];
+    player2_platform: Type[];
+
+    meteo: Meteo
+
+}
+
+interface TurnStateData {
+    p1_move_damage: number;
+    p1_move_effects: MoveEffectData[];
+
+    p2_turn_type: TurnType;
+    p2_move_index: number;
+    p2_move_damage: number;
+    p2_move_effects: MoveEffectData[];
+}
+
+interface StartStateData {
+    newBlastData: NewBlastData[];
+    meteo: Meteo;
+}
+
+interface NewBlastData {
+    id: number;
+    exp: number;
+    iv: number;
+    boss: boolean;
+    shiny: boolean;
+    status: Status;
+    activeMoveset: number[];
+}
+
 //#region Damage Calculation
 
 function calculateDamage(
@@ -154,7 +232,7 @@ function calculateWeatherModifier(weather: Meteo, moveType: Type): number {
     return modifier;
 }
 
-function calculateEffectWithProbability(blast: BlastEntity, move: Move,effectData: MoveEffectData): { blast: BlastEntity, moveEffect: MoveEffectData } {
+function calculateEffectWithProbability(blast: BlastEntity, move: Move, effectData: MoveEffectData): { blast: BlastEntity, moveEffect: MoveEffectData } {
     const statusEffectProbabilities: { [key in MoveEffect]?: number } = {
         [MoveEffect.Burn]: 0.1,
         [MoveEffect.Seeded]: 0.1,
@@ -174,13 +252,13 @@ function calculateEffectWithProbability(blast: BlastEntity, move: Move,effectDat
 
     const effectProbability = statusEffectProbabilities[effectData.effect!];
     if (Math.random() < effectProbability!) {
-        return { blast: applyEffect(blast, move,effectData), moveEffect: effectData! };
+        return { blast: applyEffect(blast, move, effectData), moveEffect: effectData! };
     }
 
-    return { blast, moveEffect: { effect: MoveEffect.None, effectModifier: 0 ,effectTarget: Target.None} };
+    return { blast, moveEffect: { effect: MoveEffect.None, effectModifier: 0, effectTarget: Target.None } };
 }
 
-function applyEffect(blast: BlastEntity, move: Move,effectData: MoveEffectData): BlastEntity {
+function applyEffect(blast: BlastEntity, move: Move, effectData: MoveEffectData): BlastEntity {
 
     var isStatusMove = move.attackType === AttackType.Status;
 
@@ -442,5 +520,11 @@ function isBlastCaptured(
 }
 
 function isShiny(probability: number = 1 / 1024): boolean {
-  return Math.random() < probability;
+    return Math.random() < probability;
+}
+
+function EndLoopDebug(logger: nkruntime.Logger, state: BattleData) {
+    logger.debug('______________ END LOOP BATTLE ______________');
+    logger.debug('Wild blast HP : %h, Mana : %m', state.p2_blasts?.[state.p2_index].hp, state.p2_blasts?.[state.p2_index].mana);
+    logger.debug('Player blast HP : %h, Mana : %m', state.p1_blasts[state.p1_index]?.hp, state.p1_blasts[state.p1_index]?.mana);
 }

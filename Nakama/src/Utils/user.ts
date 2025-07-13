@@ -10,7 +10,8 @@ interface PlayerMetadata {
     loose: number;
     blast_catched: number;
     blast_defeated: number;
-    wildBattleButtonAds: boolean;
+    pveBattleButtonAds: boolean;
+    pvpBattleButtonAds: boolean;
 }
 
 const DefaultMetadata: PlayerMetadata = {
@@ -21,7 +22,8 @@ const DefaultMetadata: PlayerMetadata = {
     loose: 0,
     blast_catched: 0,
     blast_defeated: 0,
-    wildBattleButtonAds: false,
+    pveBattleButtonAds: false,
+    pvpBattleButtonAds: false,
 };
 
 function afterAuthenticate(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, data: nkruntime.Session) {

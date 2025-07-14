@@ -1,9 +1,18 @@
 interface PvPBattleData extends BattleData {
+    turn_timer: number,
+    turn_timer_current: number,
+
+    p1_turnData: PlayerTurnData,
+    p2_turnData: PlayerTurnData,
+
     turnStateData: TurnStateData;
 }
 
+
+
+
 function rpcFindOrCreatePvPBattle(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-    var matchId = nk.matchCreate('playerVersusPlayer', {});
+    var matchId = nk.matchCreate('PvPBattle', {});
     return JSON.stringify(matchId);
 }
 
@@ -12,75 +21,101 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
     const PvPBattleData: PvPBattleData = {
         emptyTicks: 0,
         presences: {},
-        battle_state: BattleState.START,
+        battleState: BattleState.None,
 
-        player1_state: PlayerState.BUSY,
-        player1_id: "",
+        player1State: PlayerState.Busy,
+        player1Id: "",
 
-        player2_state: PlayerState.BUSY,
-        player2_id: "",
+        player2State: PlayerState.Busy,
+        player2Id: "",
 
-        p1_index: 0,
-        p1_blasts: [],
-        player1_items: [],
-        player1_platform: [],
+        p1Index: 0,
+        p1Blasts: [],
+        player1Platform: [],
 
-        p2_index: 0,
-        p2_blasts: [],
-        player2_items: [],
-        player2_platform: [],
+        p2Index: 0,
+        p2Blasts: [],
+        player2Platform: [],
 
         meteo: Meteo.None,
 
-        turnStateData: {
-            p1_move_damage: 0,
-            p1_move_effects: [],
+        turn_timer: 5,
+        turn_timer_current: 0,
 
-            p2_turn_type: TurnType.NONE,
-            p2_move_index: 0,
-            p2_move_damage: 0,
-            p2_move_effects: [],
+        p1_turnData: {
+            type: TurnType.None,
+            data: null
+        },
+
+        p2_turnData: {
+            type: TurnType.None,
+            data: null
+        },
+
+        turnStateData: {
+            p1TurnType: TurnType.None,
+            p1MoveIndex: 0,
+            p1MoveDamage: 0,
+            p1MoveEffects: [],
+
+            p2TurnType: TurnType.None,
+            p2MoveIndex: 0,
+            p2MoveDamage: 0,
+            p2MoveEffects: [],
         },
     };
 
     return {
         state: PvPBattleData,
-        tickRate: 2, // 1 tick per second = 1 MatchLoop func invocations per second
+        tickRate: 1, // 1 tick per second = 1 MatchLoop func invocations per second
         label: ''
     };
 };
 
 
 const PvPmatchJoinAttempt = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvPBattleData, presence: nkruntime.Presence, metadata: { [key: string]: any }): { state: PvPBattleData, accept: boolean, rejectMessage?: string | undefined } | null {
-    logger.debug('%q attempted to join Lobby match', ctx.userId);
+    logger.debug('%q attempted to join PvP match', ctx.userId);
 
-    return {
-        state,
-        accept: true
-    };
+    const playerCount = Object.keys(state.presences).length;
+
+    if (playerCount >= 2) {
+        return { state, accept: false, rejectMessage: "Match already full" };
+    }
+
+    return { state, accept: true };
 }
 
 const PvPmatchJoin = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvPBattleData, presences: nkruntime.Presence[]): { state: PvPBattleData } | null {
+
     for (const presence of presences) {
         state.emptyTicks = 0;
         state.presences[presence.userId] = presence;
+
+        if (!state.player1Id) {
+            state.player1Id = presence.userId;
+        } else if (!state.player2Id) {
+            state.player2Id = presence.userId;
+        }
     }
 
-    return {
-        state
-    };
-}
+    if (Object.keys(state.presences).length === 2) {
+        state.battleState = BattleState.Start;
+    }
+
+    return { state };
+};
+
 
 const PvPmatchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvPBattleData, presences: nkruntime.Presence[]): { state: PvPBattleData } | null {
     for (let presence of presences) {
         logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
 
-        if (state.player1_id == presence.userId) {
+        if (state.player1Id == presence.userId) {
             PvPPlayerLeave(nk, state, logger);
             dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
         }
 
-        if (state.player2_id == presence.userId) {
+        if (state.player2Id == presence.userId) {
             PvPPlayerLeave(nk, state, logger);
             dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
         }
@@ -105,17 +140,190 @@ const PvPmatchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger
 
 const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvPBattleData, messages: nkruntime.MatchMessage[]): { state: PvPBattleData } | null {
 
-    switch (state.battle_state) {
-        case BattleState.START:
+    switch (state.battleState) {
+        case BattleState.Start:
+            logger.debug('______________ START BATTLE ______________');
+
+            const keys = Object.keys(state.presences);
+            const player1_presence = state.presences[keys[0]]!;
+            const player2_presence = state.presences[keys[1]]!;
+
+            state.player1Id = player1_presence.userId;
+            state.player2Id = player2_presence.userId;
+
+            state.p1Index = 0;
+            state.p2Index = 0;
+
+            state.p1Blasts = getDeckBlast(nk, logger, state.player1Id);
+            state.p2Blasts = getDeckBlast(nk, logger, state.player2Id);
+
+            state.meteo = getRandomMeteo();
+
+            const p1_enemyBlast: NewBlastData = {
+                id: state.p2Blasts[state.p2Index].data_id,
+                exp: state.p2Blasts[state.p2Index].exp,
+                iv: state.p2Blasts[state.p2Index].iv,
+                boss: state.p2Blasts[state.p2Index].boss,
+                shiny: state.p2Blasts[state.p2Index].shiny,
+                activeMoveset: state.p2Blasts[state.p2Index].activeMoveset,
+                status: Status.None,
+            };
+
+            const p2_enemyBlast: NewBlastData = {
+                id: state.p1Blasts[state.p1Index].data_id,
+                exp: state.p1Blasts[state.p1Index].exp,
+                iv: state.p1Blasts[state.p1Index].iv,
+                boss: state.p1Blasts[state.p1Index].boss,
+                shiny: state.p1Blasts[state.p1Index].shiny,
+                activeMoveset: state.p1Blasts[state.p1Index].activeMoveset,
+                status: Status.None,
+            };
+
+            const startDataP1: StartStateData = {
+                newBlastData: p1_enemyBlast,
+                meteo: state.meteo,
+            };
+
+            const startDataP2: StartStateData = {
+                newBlastData: p2_enemyBlast,
+                meteo: state.meteo,
+            };
+
+            dispatcher.broadcastMessage(
+                OpCodes.MATCH_START,
+                JSON.stringify(startDataP1),
+                [player1_presence]
+            );
+
+            dispatcher.broadcastMessage(
+                OpCodes.MATCH_START,
+                JSON.stringify(startDataP2),
+                [player2_presence]
+            );
+
+            state.battleState = BattleState.Waiting;
+
+            logger.debug('______________ END START BATTLE ______________');
             break;
-        case BattleState.WAITING:
+
+        case BattleState.Waiting:
+            messages.forEach(function (message) {
+                switch (message.opCode) {
+                    case OpCodes.PLAYER_READY:
+                        const userId = message.sender.userId;
+
+                        if (userId === state.player1Id) {
+                            state.player1State = PlayerState.Ready;
+                            logger.debug("P1 Ready");
+                        } else if (userId === state.player2Id) {
+                            state.player2State = PlayerState.Ready;
+                            logger.debug("P2 Ready");
+                        }
+                        break;
+                }
+            });
+
+            if (state.player1State === PlayerState.Ready && state.player2State === PlayerState.Ready) {
+                dispatcher.broadcastMessage(OpCodes.ENEMY_READY);
+
+                state.turn_timer_current = state.turn_timer;
+
+                state.battleState = BattleState.Ready;
+            }
             break;
-        case BattleState.READY:
+        case BattleState.Ready:
+            for (const message of messages) {
+                const userId = message.sender.userId;
+
+                const parsed = JSON.parse(nk.binaryToString(message.data));
+
+                const action: PlayerTurnData = {
+                    type: parsed.type,
+                    data: parsed.data
+                };
+
+                if (userId === state.player1Id) {
+                    state.p1_turnData.type = action.type;
+
+                }
+
+                if (userId === state.player2Id) {
+                    state.p2_turnData.type = action.type;
+                }
+            }
+
+            state.turn_timer--;
+
+            const p1Played = state.p1_turnData.type !== TurnType.None;
+            const p2Played = state.p2_turnData.type !== TurnType.None;
+
+            if ((p1Played && p2Played) || state.turn_timer <= 0) {
+                if (!p1Played) {
+                    logger.debug("Joueur 1 a dépassé le temps, action = WAIT");
+                    state.p1_turnData.type = TurnType.Wait;
+                }
+
+                if (!p2Played) {
+                    logger.debug("Joueur 2 a dépassé le temps, action = WAIT");
+                    state.p2_turnData.type = TurnType.Wait;
+                }
+
+                state.player1State = PlayerState.Busy;
+                state.player2State = PlayerState.Busy;
+
+                state.battleState = BattleState.ResolveTurn;
+            }
             break;
-        case BattleState.WAITFORPLAYERSWAP:
+        case BattleState.ResolveTurn:
+
+            if (state.p1_turnData.type === TurnType.Wait && state.p2_turnData.type === TurnType.Wait) {
+                logger.debug("Both players waited, resolving turn...");
+            }
+
+            state.battleState = BattleState.Waiting;
+
             break;
-        case BattleState.END:
+        case BattleState.WaitForPlayerSwap:
             break;
+        case BattleState.End:
+
+            const allP1BlastFainted = isAllBlastDead(state.p1Blasts);
+            const allP2BlastFainted = isAllBlastDead(state.p2Blasts);
+
+            if (allP1BlastFainted && allP2BlastFainted) {
+
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [
+                    state.presences[state.player1Id]!,
+                    state.presences[state.player2Id]!
+                ]);
+
+                return null;
+            }
+
+            if (allP1BlastFainted) {
+
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player1Id]!]);
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player2Id]!]);
+
+                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20);
+                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20);
+
+
+                return null;
+            }
+
+            if (allP2BlastFainted) {
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player1Id]!]);
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player2Id]!]);
+
+                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20);
+                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20);
+
+                return null;
+            }
+
+            logger.debug('______________ END BATTLE ______________');
+
     }
 
 
@@ -151,14 +359,13 @@ const PvPmatchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Lo
 }
 
 function PvPPlayerLeave(nk: nkruntime.Nakama, state: PvPBattleData, logger: nkruntime.Logger) {
-    let bonusAds = getMetadataStat(nk, state.player1_id, "pvpBattleButtonAds");
+    let bonusAds = getMetadataStat(nk, state.player1Id, "pvpBattleButtonAds");
 
-    updateWalletWithCurrency(nk, state.player1_id, Currency.Trophies, -20);
-
-    updateWalletWithCurrency(nk, state.player1_id, Currency.Coins, 1000);
+    updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20);
+    updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000);
 
     if (bonusAds) {
-        updateWalletWithCurrency(nk, state.player1_id, Currency.Coins, 1000 / 2);
-        setMetadataStat(nk, state.player1_id, "pvpBattleButtonAds", false);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000 / 2);
+        setMetadataStat(nk, state.player1Id, "pvpBattleButtonAds", false);
     }
 }

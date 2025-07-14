@@ -2,27 +2,28 @@ const healManaPerRound = 20;
 const healManaPerWait = 50;
 
 enum BattleState {
-    NONE,
-    WAITING,
-    READY,
-    START,
-    WAITFORPLAYERSWAP,
-    WAITFORPLAYERCHOOSEOFFER,
-    END,
+    None,
+    Start,
+    Waiting,
+    Ready,
+    ResolveTurn,
+    WaitForPlayerSwap,
+    WaitForPlayerChooseOffer,
+    End,
 }
 
 enum PlayerState {
-    NONE,
-    BUSY,
-    READY,
+    None,
+    Busy,
+    Ready,
 }
 
 enum TurnType {
-    NONE,
-    ATTACK,
-    ITEM,
-    SWAP,
-    WAIT
+    None,
+    Attack,
+    Item,
+    Swap,
+    Wait
 }
 
 interface BattleData {
@@ -30,42 +31,48 @@ interface BattleData {
 
     presences: { [userId: string]: nkruntime.Presence | null }
 
-    battle_state: BattleState;
+    battleState: BattleState;
 
 
-    player1_state: PlayerState;
-    player1_id: string;
+    player1State: PlayerState;
+    player1Id: string;
 
-    p1_index: number;
-    p1_blasts: BlastEntity[];
-    player1_items: Item[];
-    player1_platform: Type[];
+    p1Index: number;
+    p1Blasts: BlastEntity[];
+
+    player1Platform: Type[];
 
 
-    player2_state: PlayerState;
-    player2_id: string;
+    player2State: PlayerState;
+    player2Id: string;
 
-    p2_index: number;
-    p2_blasts: BlastEntity[];
-    player2_items: Item[];
-    player2_platform: Type[];
+    p2Index: number;
+    p2Blasts: BlastEntity[];
+    player2Platform: Type[];
 
     meteo: Meteo
 
 }
 
-interface TurnStateData {
-    p1_move_damage: number;
-    p1_move_effects: MoveEffectData[];
+interface PlayerTurnData {
+    type: TurnType;
+    data?: any;
+}
 
-    p2_turn_type: TurnType;
-    p2_move_index: number;
-    p2_move_damage: number;
-    p2_move_effects: MoveEffectData[];
+interface TurnStateData {
+    p1TurnType: TurnType;
+    p1MoveIndex: number;
+    p1MoveDamage: number;
+    p1MoveEffects: MoveEffectData[];
+
+    p2TurnType: TurnType;
+    p2MoveIndex: number;
+    p2MoveDamage: number;
+    p2MoveEffects: MoveEffectData[];
 }
 
 interface StartStateData {
-    newBlastData: NewBlastData[];
+    newBlastData: NewBlastData;
     meteo: Meteo;
 }
 
@@ -525,6 +532,6 @@ function isShiny(probability: number = 1 / 1024): boolean {
 
 function EndLoopDebug(logger: nkruntime.Logger, state: BattleData) {
     logger.debug('______________ END LOOP BATTLE ______________');
-    logger.debug('Wild blast HP : %h, Mana : %m', state.p2_blasts?.[state.p2_index].hp, state.p2_blasts?.[state.p2_index].mana);
-    logger.debug('Player blast HP : %h, Mana : %m', state.p1_blasts[state.p1_index]?.hp, state.p1_blasts[state.p1_index]?.mana);
+    logger.debug('Wild blast HP : %h, Mana : %m', state.p2Blasts?.[state.p2Index].hp, state.p2Blasts?.[state.p2Index].mana);
+    logger.debug('Player blast HP : %h, Mana : %m', state.p1Blasts[state.p1Index]?.hp, state.p1Blasts[state.p1Index]?.mana);
 }

@@ -62,10 +62,10 @@ let InitModule: nkruntime.InitModule = function (ctx: nkruntime.Context, logger:
     initializer.registerRpc('loadMovePedia', rpcLoadMovePedia);
     initializer.registerRpc('loadAllArea', rpcLoadAllArea);
 
-    // Wild Battle
+    // PvE Battle
     initializer.registerRpc('findWildBattle', rpcCreatePvEBattle);
     
-    initializer.registerMatch('wildBattle', {
+    initializer.registerMatch('PvEBattle', {
         matchInit: PvEinitMatch,
         matchJoinAttempt: PvEmatchJoinAttempt,
         matchJoin: PvEmatchJoin,
@@ -74,6 +74,20 @@ let InitModule: nkruntime.InitModule = function (ctx: nkruntime.Context, logger:
         matchSignal: PvEmatchSignal,
         matchTerminate: PvEmatchTerminate
     });
+
+    // PvP Battle
+    initializer.registerRpc('findPvPBattle', rpcFindOrCreatePvPBattle);
+
+    initializer.registerMatch('PvPBattle', {
+        matchInit: PvPinitMatch,
+        matchJoinAttempt: PvPmatchJoinAttempt,
+        matchJoin: PvPmatchJoin,
+        matchLeave: PvPmatchLeave,
+        matchLoop: PvPmatchLoop,
+        matchSignal: PvPmatchSignal,
+        matchTerminate: PvPmatchTerminate
+    });
+
     
     // User
     initializer.registerRpc('updateNicknameStatus', rpcUpdateNicknameStatus);

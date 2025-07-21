@@ -1,9 +1,9 @@
 enum OfferType {
-    NONE,
-    COINS,
-    GEMS,
-    BLAST,
-    ITEM,
+    None,
+    Coin,
+    Gem,
+    Blast,
+    Item,
 }
 
 interface Offer {
@@ -33,7 +33,7 @@ const blastTrap: Item = {
 const blastTrapOffer: StoreOffer = {
     offer_id: 1,
     offer: {
-        type: OfferType.ITEM,
+        type: OfferType.Item,
 
         coinsAmount: 0,
         gemsAmount: 0,
@@ -54,7 +54,7 @@ const superBlastTrap: Item = {
 const superBlastTrapOffer: StoreOffer = {
     offer_id: 2,
     offer: {
-        type: OfferType.ITEM,
+        type: OfferType.Item,
 
         coinsAmount: 0,
         gemsAmount: 0,
@@ -74,7 +74,7 @@ const hyperBlastTrap: Item = {
 const hyperBlastTrapOffer: StoreOffer = {
     offer_id: 3,
     offer: {
-        type: OfferType.ITEM,
+        type: OfferType.Item,
 
         coinsAmount: 0,
         gemsAmount: 0,
@@ -123,7 +123,7 @@ const rpcBuyTrapOffer: nkruntime.RpcFunction =
 const coinsOffer1: StoreOffer = {
     offer_id: 4,
     offer: {
-        type: OfferType.COINS,
+        type: OfferType.Coin,
 
         coinsAmount: 20000,
         gemsAmount: 0,
@@ -140,7 +140,7 @@ const coinsOffer2: StoreOffer = {
     offer_id: 5,
     offer: {
 
-        type: OfferType.COINS,
+        type: OfferType.Coin,
 
         coinsAmount: 65000,
         gemsAmount: 0,
@@ -156,7 +156,7 @@ const coinsOffer2: StoreOffer = {
 const coinsOffer3: StoreOffer = {
     offer_id: 6,
     offer: {
-        type: OfferType.COINS,
+        type: OfferType.Coin,
 
         coinsAmount: 140000,
         gemsAmount: 0,
@@ -203,7 +203,7 @@ const rpcBuyCoinOffer: nkruntime.RpcFunction =
 const gemsOffer1: StoreOffer = {
     offer_id: 7,
     offer: {
-        type: OfferType.GEMS,
+        type: OfferType.Gem,
 
         coinsAmount: 0,
         gemsAmount: 160,
@@ -218,7 +218,7 @@ const gemsOffer1: StoreOffer = {
 const gemsOffer2: StoreOffer = {
     offer_id: 8,
     offer: {
-        type: OfferType.GEMS,
+        type: OfferType.Gem,
 
         coinsAmount: 0,
         gemsAmount: 500,
@@ -234,7 +234,7 @@ const gemsOffer2: StoreOffer = {
 const gemsOffer3: StoreOffer = {
     offer_id: 9,
     offer: {
-        type: OfferType.GEMS,
+        type: OfferType.Gem,
 
         coinsAmount: 0,
         gemsAmount: 1200,
@@ -250,7 +250,7 @@ const gemsOffer3: StoreOffer = {
 const gemsOffer4: StoreOffer = {
     offer_id: 10,
     offer: {
-        type: OfferType.GEMS,
+        type: OfferType.Gem,
 
         coinsAmount: 0,
         gemsAmount: 2500,
@@ -266,7 +266,7 @@ const gemsOffer4: StoreOffer = {
 const gemsOffer5: StoreOffer = {
     offer_id: 11,
     offer: {
-        type: OfferType.GEMS,
+        type: OfferType.Gem,
 
         coinsAmount: 0,
         gemsAmount: 6500,
@@ -283,7 +283,7 @@ const gemsOffer6: StoreOffer = {
     offer_id: 12,
     offer: {
 
-        type: OfferType.GEMS,
+        type: OfferType.Gem,
 
         coinsAmount: 0,
         gemsAmount: 14000,

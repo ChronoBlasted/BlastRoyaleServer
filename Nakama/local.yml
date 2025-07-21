@@ -9,6 +9,7 @@ runtime:
   js_entrypoint: "./build/index.js"
 session:
   token_expiry_sec: 7200 # 2 hours
+  refresh_token_expiry_sec: 31536000  # 1 an, soit 60 * 60 * 24 * 365
 socket:
   max_message_size_bytes: 4096
   max_request_size_bytes: 131072

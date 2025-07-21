@@ -1,10 +1,18 @@
-const WildBattleAds = 'wildBattleButtonAds';
+const pveBattleButtonAds = 'pveBattleButtonAds';
+const pvpBattleButtonAds = 'pvpBattleButtonAds';
 
-function rpcWatchWildBattleAds(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string) {
+function rpcWatchPvEBattleAds(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string) {
     const userId = context.userId;
 
-    setMetadataStat(nk, userId, WildBattleAds, true);
+    setMetadataStat(nk, userId, pveBattleButtonAds, true);
 }
+
+function rpcWatchPvPBattleAds(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string) {
+    const userId = context.userId;
+
+    setMetadataStat(nk, userId, pvpBattleButtonAds, true);
+}
+
 
 function rpcWatchRefreshShopAds(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
     if (!context.userId) {

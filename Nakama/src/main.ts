@@ -40,7 +40,8 @@ let InitModule: nkruntime.InitModule = function (ctx: nkruntime.Context, logger:
     initializer.registerRpc('buyDailyShopOffer', rpcBuyDailyShopOffer);
 
     // Ads  
-    initializer.registerRpc('watchWildBattleAds', rpcWatchWildBattleAds);
+    initializer.registerRpc('watchPvEBattleAds', rpcWatchPvEBattleAds);
+    initializer.registerRpc('watchPvPBattleAds', rpcWatchPvPBattleAds);
     initializer.registerRpc('watchRefreshShopAds', rpcWatchRefreshShopAds);
 
     // Area
@@ -63,7 +64,7 @@ let InitModule: nkruntime.InitModule = function (ctx: nkruntime.Context, logger:
     initializer.registerRpc('loadAllArea', rpcLoadAllArea);
 
     // PvE Battle
-    initializer.registerRpc('findWildBattle', rpcCreatePvEBattle);
+    initializer.registerRpc('findPvEBattle', rpcCreatePvEBattle);
     
     initializer.registerMatch('PvEBattle', {
         matchInit: PvEinitMatch,

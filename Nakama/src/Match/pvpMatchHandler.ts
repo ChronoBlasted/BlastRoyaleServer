@@ -8,13 +8,30 @@ interface PvPBattleData extends BattleData {
     turnStateData: TurnStateData;
 }
 
+function rpcFindOrCreatePvPBattle(
+  context: nkruntime.Context,
+  logger: nkruntime.Logger,
+  nk: nkruntime.Nakama
+): string {
+  const limit = 10;
+  const isAuthoritative = true;
+  const label = "PvPBattle"; // ← Doit correspondre au label défini dans matchInit
+  const minSize = 1;
+  const maxSize = 2;
 
+  const matches = nk.matchList(limit, isAuthoritative, label, minSize, maxSize, "");
 
+  if (matches.length > 0) {
+    matches.sort((a, b) => b.size - a.size);
+    logger.info("Match existant trouvé : " + matches[0].matchId);
+    return JSON.stringify(matches[0].matchId);
+  }
 
-function rpcFindOrCreatePvPBattle(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama): string {
-    var matchId = nk.matchCreate('PvPBattle', {});
-    return JSON.stringify(matchId);
+  const matchId = nk.matchCreate("PvPBattle", {});
+  logger.info("Aucun match trouvé, création d'un nouveau : " + matchId);
+  return JSON.stringify(matchId);
 }
+
 
 const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, params: { [key: string]: string }): { state: PvPBattleData, tickRate: number, label: string } {
 

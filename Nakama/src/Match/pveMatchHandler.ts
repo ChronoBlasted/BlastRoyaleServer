@@ -1,7 +1,6 @@
 // region Setup 
 
 interface PvEBattleData extends BattleData {
-
     turnStateData: WildTurnStateData;
 
     player1Items: Item[];
@@ -74,21 +73,21 @@ const PvEinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
         offerTurnStateData: {
             offerOne: {
-                type: OfferType.NONE,
+                type: OfferType.None,
                 coinsAmount: 0,
                 gemsAmount: 0,
                 blast: null,
                 item: null,
             },
             offerTwo: {
-                type: OfferType.NONE,
+                type: OfferType.None,
                 coinsAmount: 0,
                 gemsAmount: 0,
                 blast: null,
                 item: null,
             },
             offerThree: {
-                type: OfferType.NONE,
+                type: OfferType.None,
                 coinsAmount: 0,
                 gemsAmount: 0,
                 blast: null,
@@ -309,16 +308,16 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         var itemData = getItemDataById(item.data_id);
 
                         switch (itemData.behaviour) {
-                            case ITEM_BEHAVIOUR.HEAL:
+                            case ITEM_BEHAVIOUR.Heal:
                                 state.p1Blasts[msgItem.index_blast] = healHealthBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
                                 break;
-                            case ITEM_BEHAVIOUR.MANA:
+                            case ITEM_BEHAVIOUR.Mana:
                                 state.p1Blasts[msgItem.index_blast] = healManaBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
                                 break;
-                            case ITEM_BEHAVIOUR.STATUS:
+                            case ITEM_BEHAVIOUR.Status:
                                 state.p1Blasts[msgItem.index_blast] = healStatusBlast(state.p1Blasts[msgItem.index_blast], itemData.status!);
                                 break;
-                            case ITEM_BEHAVIOUR.CATCH:
+                            case ITEM_BEHAVIOUR.Catch:
                                 var wildBlastCaptured = false;
 
                                 wildBlastCaptured = isBlastCaptured(state.p2Blasts![state.p2Index].hp, state.p2Blasts![state.p2Index].maxHp, getBlastDataById(state.p2Blasts![state.p2Index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
@@ -476,7 +475,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     var indexChooseOffer = clamp(JSON.parse(nk.binaryToString(message.data)), 0, 2);
 
                     let currentOffer: Offer = {
-                        type: OfferType.NONE,
+                        type: OfferType.None,
                         coinsAmount: 0,
                         gemsAmount: 0,
                         blast: null,
@@ -496,23 +495,23 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     }
 
                     switch (currentOffer.type) {
-                        case OfferType.BLAST:
+                        case OfferType.Blast:
                             addBlast(nk, logger, state.player1Id, currentOffer.blast!);
                             break;
-                        case OfferType.ITEM:
+                        case OfferType.Item:
                             addItem(nk, logger, state.player1Id, currentOffer.item!);
                             break;
-                        case OfferType.COINS:
+                        case OfferType.Coin:
                             updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount);
 
                             if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount / 2)
                             break;
-                        case OfferType.GEMS:
+                        case OfferType.Gem:
                             updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount);
 
                             if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount / 2)
                             break;
-                        case OfferType.NONE:
+                        case OfferType.None:
                             break;
                     }
 
@@ -948,7 +947,7 @@ function checkIfMatchContinue(state: PvEBattleData): PvEBattleData {
 // region Offer Turn Logic
 function getRandomOffer(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkruntime.Logger): Offer {
     let offer: Offer = {
-        type: OfferType.ITEM,
+        type: OfferType.Item,
         coinsAmount: 0,
         gemsAmount: 0,
         blast: null,
@@ -958,20 +957,20 @@ function getRandomOffer(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkru
     const random = Math.floor(Math.random() * 4);
     switch (random) {
         case 0:
-            offer.type = OfferType.BLAST;
+            offer.type = OfferType.Blast;
             var newBlast = GetNewWildBlast(state, nk, logger);
             offer.blast = newBlast;
             break;
         case 1:
-            offer.type = OfferType.ITEM;
+            offer.type = OfferType.Item;
             offer.item = getRandomItem(5);
             break;
         case 2:
-            offer.type = OfferType.COINS;
+            offer.type = OfferType.Coin;
             offer.coinsAmount = Math.floor(Math.random() * 1000) + 1;
             break;
         case 3:
-            offer.type = OfferType.GEMS;
+            offer.type = OfferType.Gem;
             offer.gemsAmount = Math.floor(Math.random() * 10) + 1;
             break;
     }

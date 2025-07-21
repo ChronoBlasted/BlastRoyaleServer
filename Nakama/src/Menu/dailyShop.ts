@@ -179,7 +179,7 @@ function getRandomStoreOffer(nk: nkruntime.Nakama, userId: string, logger: nkrun
     let storeOffer: StoreOffer = {
         offer_id: -1,
         offer: {
-            type: OfferType.NONE,
+            type: OfferType.None,
             coinsAmount: 0,
             gemsAmount: 0,
             blast: null,
@@ -191,12 +191,12 @@ function getRandomStoreOffer(nk: nkruntime.Nakama, userId: string, logger: nkrun
     };
 
     if (Math.random() < 0.5) {
-        storeOffer.offer.type = OfferType.BLAST;
+        storeOffer.offer.type = OfferType.Blast;
         storeOffer.offer.blast = getRandomBlastEntityInAllPlayerArea(userId, nk, false);
         storeOffer.price = getBlastPrice(storeOffer.offer.blast);
         storeOffer.currency = Currency.Coins;
     } else {
-        storeOffer.offer.type = OfferType.ITEM;
+        storeOffer.offer.type = OfferType.Item;
         storeOffer.offer.item = getRandomItem(1 + Math.floor(Math.random() * 10));
 
         storeOffer.price = getItemPrice(storeOffer.offer.item) * storeOffer.offer.item.amount;

@@ -2,34 +2,31 @@ interface PvPBattleData extends BattleData {
     turn_timer: number,
     turn_timer_current: number,
 
-    p1_turnData: PlayerTurnData,
-    p2_turnData: PlayerTurnData,
 
-    turnStateData: TurnStateData;
 }
 
 function rpcFindOrCreatePvPBattle(
-  context: nkruntime.Context,
-  logger: nkruntime.Logger,
-  nk: nkruntime.Nakama
+    context: nkruntime.Context,
+    logger: nkruntime.Logger,
+    nk: nkruntime.Nakama
 ): string {
-  const limit = 10;
-  const isAuthoritative = true;
-  const label = "PvPBattle"; // ← Doit correspondre au label défini dans matchInit
-  const minSize = 1;
-  const maxSize = 2;
+    const limit = 10;
+    const isAuthoritative = true;
+    const label = "PvPBattle"; // ← Doit correspondre au label défini dans matchInit
+    const minSize = 1;
+    const maxSize = 2;
 
-  const matches = nk.matchList(limit, isAuthoritative, label, minSize, maxSize, "");
+    const matches = nk.matchList(limit, isAuthoritative, label, minSize, maxSize, "");
 
-  if (matches.length > 0) {
-    matches.sort((a, b) => b.size - a.size);
-    logger.info("Match existant trouvé : " + matches[0].matchId);
-    return JSON.stringify(matches[0].matchId);
-  }
+    if (matches.length > 0) {
+        matches.sort((a, b) => b.size - a.size);
+        logger.info("Match existant trouvé : " + matches[0].matchId);
+        return JSON.stringify(matches[0].matchId);
+    }
 
-  const matchId = nk.matchCreate("PvPBattle", {});
-  logger.info("Aucun match trouvé, création d'un nouveau : " + matchId);
-  return JSON.stringify(matchId);
+    const matchId = nk.matchCreate("PvPBattle", {});
+    logger.info("Aucun match trouvé, création d'un nouveau : " + matchId);
+    return JSON.stringify(matchId);
 }
 
 
@@ -59,27 +56,23 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         turn_timer: 5,
         turn_timer_current: 0,
 
-        p1_turnData: {
-            type: TurnType.None,
-            data: null
-        },
-
-        p2_turnData: {
-            type: TurnType.None,
-            data: null
-        },
-
         turnStateData: {
-            p1TurnType: TurnType.None,
-            p1MoveIndex: 0,
-            p1MoveDamage: 0,
-            p1MoveEffects: [],
+            p1TurnData: {
+                type: TurnType.None,
+                moveIndex: 0,
+                moveDamage: 0,
+                moveEffects: [],
+            },
 
-            p2TurnType: TurnType.None,
-            p2MoveIndex: 0,
-            p2MoveDamage: 0,
-            p2MoveEffects: [],
-        },
+            p2TurnData: {
+                type: TurnType.None,
+                moveIndex: 0,
+                moveDamage: 0,
+                moveEffects: [],
+            },
+
+            catched: false
+        }
     };
 
     return {
@@ -254,46 +247,49 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 const parsed = JSON.parse(nk.binaryToString(message.data));
 
-                const action: PlayerTurnData = {
+                const action: PlayerActionData = {
                     type: parsed.type,
-                    data: parsed.data
+                    data: parsed.data,
                 };
 
                 if (userId === state.player1Id) {
-                    state.p1_turnData.type = action.type;
+                    state.turnStateData.p1TurnData.type = action.type;
 
                 }
 
                 if (userId === state.player2Id) {
-                    state.p2_turnData.type = action.type;
+                    state.turnStateData.p2TurnData.type = action.type;
                 }
             }
 
             state.turn_timer--;
 
-            const p1Played = state.p1_turnData.type !== TurnType.None;
-            const p2Played = state.p2_turnData.type !== TurnType.None;
+            const p1Played = state.turnStateData.p1TurnData.type !== TurnType.None;
+            const p2Played = state.turnStateData.p2TurnData.type !== TurnType.None;
 
             if ((p1Played && p2Played) || state.turn_timer <= 0) {
                 if (!p1Played) {
                     logger.debug("Joueur 1 a dépassé le temps, action = WAIT");
-                    state.p1_turnData.type = TurnType.Wait;
+                    state.turnStateData.p1TurnData.type = TurnType.Wait;
                 }
 
                 if (!p2Played) {
                     logger.debug("Joueur 2 a dépassé le temps, action = WAIT");
-                    state.p2_turnData.type = TurnType.Wait;
+                    state.turnStateData.p2TurnData.type = TurnType.Wait;
                 }
 
                 state.player1State = PlayerState.Busy;
                 state.player2State = PlayerState.Busy;
 
                 state.battleState = BattleState.ResolveTurn;
+
+                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData.p2TurnData), [state.presences[state.player1Id]!]);
+                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData.p1TurnData), [state.presences[state.player2Id]!]);
             }
             break;
         case BattleState.ResolveTurn:
 
-            if (state.p1_turnData.type === TurnType.Wait && state.p2_turnData.type === TurnType.Wait) {
+            if (state.turnStateData.p1TurnData.type === TurnType.Wait && state.turnStateData.p2TurnData.type === TurnType.Wait) {
                 logger.debug("Both players waited, resolving turn...");
             }
 
@@ -340,9 +336,7 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             }
 
             logger.debug('______________ END BATTLE ______________');
-
     }
-
 
     if (ConnectedPlayers(state) === 0) {
         logger.debug('Running empty ticks: %d', state.emptyTicks);

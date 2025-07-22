@@ -23,7 +23,8 @@ enum TurnType {
     Attack,
     Item,
     Swap,
-    Wait
+    Wait,
+    Status
 }
 
 interface BattleData {
@@ -33,7 +34,6 @@ interface BattleData {
 
     battleState: BattleState;
 
-
     player1State: PlayerState;
     player1Id: string;
 
@@ -42,7 +42,6 @@ interface BattleData {
 
     player1Platform: Type[];
 
-
     player2State: PlayerState;
     player2Id: string;
 
@@ -50,25 +49,25 @@ interface BattleData {
     p2Blasts: BlastEntity[];
     player2Platform: Type[];
 
-    meteo: Meteo
+    turnStateData: {
+        p1TurnData: PlayerTurnData,
+        p2TurnData: PlayerTurnData,
+        catched: boolean;
+    }
 
+    meteo: Meteo
 }
 
-interface PlayerTurnData {
+interface PlayerActionData {
     type: TurnType;
     data?: any;
 }
 
-interface TurnStateData {
-    p1TurnType: TurnType;
-    p1MoveIndex: number;
-    p1MoveDamage: number;
-    p1MoveEffects: MoveEffectData[];
-
-    p2TurnType: TurnType;
-    p2MoveIndex: number;
-    p2MoveDamage: number;
-    p2MoveEffects: MoveEffectData[];
+interface PlayerTurnData {
+    type: TurnType;
+    moveIndex: number;
+    moveDamage: number;
+    moveEffects: MoveEffectData[];
 }
 
 interface StartStateData {

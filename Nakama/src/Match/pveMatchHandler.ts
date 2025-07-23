@@ -79,14 +79,14 @@ const PvEinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         turnStateData: {
             p1TurnData: {
                 type: TurnType.None,
-                moveIndex: 0,
+                index: 0,
                 moveDamage: 0,
                 moveEffects: [],
             },
 
             p2TurnData: {
                 type: TurnType.None,
-                moveIndex: 0,
+                index: 0,
                 moveDamage: 0,
                 moveEffects: [],
             },
@@ -231,13 +231,29 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 dispatcher.broadcastMessage(OpCodes.ENEMY_READY);
                 state.battleState = BattleState.Ready;
 
+                state.turnStateData.p1TurnData = {
+                    type: TurnType.None,
+                    index: 0,
+                    moveDamage: 0,
+                    moveEffects: [],
+                }
+
+                state.turnStateData.p2TurnData = {
+                    type: TurnType.None,
+                    index: getRandomUsableMove(getMovesByIds(state.p2Blasts![state.p2Index].activeMoveset!), state.p2Blasts![state.p2Index].mana, state.player2Platform),
+                    moveDamage: 0,
+                    moveEffects: [],
+                }
+
+                state.turnStateData.catched = false;
+
                 logger.debug('______________ EVERYONE"S READY ______________');
             }
 
             break;
         case BattleState.Ready:
 
-            messages.forEach(function (message) {
+            for (const message of messages) {
 
                 const validOpCodes = [
                     OpCodes.PLAYER_ATTACK,
@@ -248,184 +264,194 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 ];
 
                 if (!validOpCodes.includes(message.opCode)) {
-                    ({ state } = ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.Ready));
-                    return;
+                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.Ready);
+                    break;
                 }
-
-                logger.debug('______________ LOOP BATTLE ______________');
-
-                message.data == null ? logger.debug('Receive Op code : %d', message.opCode) : logger.debug('Receive Op code : %d, with data : %e', message.opCode, JSON.parse(nk.binaryToString(message.data)));
-
-                state.player1State = PlayerState.Busy;
-
-                state.turnStateData.p1TurnData = {
-                    type: TurnType.None,
-                    moveIndex: 0,
-                    moveDamage: 0,
-                    moveEffects: [],
-                }
-
-                state.turnStateData.p2TurnData = {
-                    type: TurnType.None,
-                    moveIndex: getRandomUsableMove(getMovesByIds(state.p2Blasts![state.p2Index].activeMoveset!), state.p2Blasts![state.p2Index].mana, state.player2Platform),
-                    moveDamage: 0,
-                    moveEffects: [],
-                }
-
-                state.turnStateData.catched = false;
-
-
-                // Set state
 
                 const parsed = JSON.parse(nk.binaryToString(message.data));
 
-                const action: PlayerActionData = {
-                    type: parsed.type,
-                    data: parsed.data,
-                };
+                logger.debug('Receive Op code : %d, with data : %e', message.opCode, parsed);
 
-                state.turnStateData.p1TurnData.type = action.type;
+                let actionType: TurnType = parseEnum(parsed.type.toString(), TurnType);
+                state.turnStateData.p1TurnData.type = actionType;
 
-                switch (message.opCode) {
-                    // region Attack
-                    case OpCodes.PLAYER_ATTACK:
-                        let attackIndex = clamp(action.data, 0, 3);
-                        let move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![attackIndex]);
+                actionType === TurnType.Item ? (state.turnStateData.p1TurnData.itemUse = parsed.data) : (state.turnStateData.p1TurnData.index = parsed.data ?? 0);
 
-                        if (move == null) {
-                            ({ state } = ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready));
-                            return;
-                        }
-
-                        state = performAttackSequence(state, move, dispatcher, nk, logger);
-                        state.turnStateData.p1TurnData.moveIndex = attackIndex;
-
-                        break;
-                    // region Player Use Item
-                    case OpCodes.PLAYER_USE_ITEM:
-                        let msgItem = {} as ItemUseJSON;
-                        msgItem = JSON.parse(action.data);
-                        msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
-                        let item = state.player1Items[msgItem.index_item];
-
-                        if (item == null) {
-                            ({ state } = ErrorFunc(state, "Item to use is null", dispatcher, BattleState.Ready));
-                            return;
-                        }
-
-                        if (item.amount <= 0) {
-                            ({ state } = ErrorFunc(state, "U don't have enough item", dispatcher, BattleState.Ready));
-                            return;
-                        }
-
-                        useItem(nk, logger, state.player1Id, item);
-
-                        var itemData = getItemDataById(item.data_id);
-
-                        switch (itemData.behaviour) {
-                            case ITEM_BEHAVIOUR.Heal:
-                                state.p1Blasts[msgItem.index_blast] = healHealthBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
-                                break;
-                            case ITEM_BEHAVIOUR.Mana:
-                                state.p1Blasts[msgItem.index_blast] = healManaBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
-                                break;
-                            case ITEM_BEHAVIOUR.Status:
-                                state.p1Blasts[msgItem.index_blast] = healStatusBlast(state.p1Blasts[msgItem.index_blast], itemData.status!);
-                                break;
-                            case ITEM_BEHAVIOUR.Catch:
-                                var wildBlastCaptured = false;
-
-                                wildBlastCaptured = isBlastCaptured(state.p2Blasts![state.p2Index].hp, state.p2Blasts![state.p2Index].maxHp, getBlastDataById(state.p2Blasts![state.p2Index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
-
-                                if (wildBlastCaptured) {
-                                    logger.debug('Wild blast Captured !', wildBlastCaptured);
-
-                                    state.battleState = BattleState.End;
-                                }
-
-                                state.turnStateData.catched = wildBlastCaptured;
-                                break;
-                            default:
-                        }
-
-                        state.turnStateData.p1TurnData.type = TurnType.Item;
-
-                        ({ state } = executeWildBlastAttack(state, dispatcher, logger));
-                        break;
-                    // region Player Change
-                    case OpCodes.PLAYER_CHANGE_BLAST:
-                        var msgChangeBlast = clamp(JSON.parse(action.data), 0, state.p1Blasts.length - 1);
-
-                        if (state.p1Index == msgChangeBlast) {
-                            ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
-                            return;
-                        }
-
-                        if (!isBlastAlive(state.p1Blasts[msgChangeBlast])) {
-                            ({ state } = ErrorFunc(state, "Cannot change actual blast with dead blast in Ready", dispatcher, BattleState.Ready));
-                            return;
-                        }
-
-                        state.p1Index = msgChangeBlast;
-
-                        state.turnStateData.p1TurnData.type = TurnType.Swap;
-
-                        ({ state } = executeWildBlastAttack(state, dispatcher, logger));
-                        break;
-                    // region Player Wait
-                    case OpCodes.PLAYER_WAIT:
-                        state.player1State = PlayerState.Busy;
-
-                        state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, true);
-
-                        state.turnStateData.p1TurnData.type = TurnType.Wait;
-
-                        ({ state } = executeWildBlastAttack(state, dispatcher, logger));
-                        break;
-
-                    case OpCodes.PLAYER_LEAVE:
-                        PvEPlayerLeave(nk, state, logger);
-                        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
-
-                        return null;
+                if (message.opCode == OpCodes.PLAYER_LEAVE) {
+                    PvEPlayerLeave(nk, state, logger);
+                    dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
                 }
 
-                // region End turn Logic
+            }
 
-                ({ blast: state.p1Blasts[state.p1Index]!, otherBlast: state.p2Blasts![state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index]!, state.p2Blasts![state.p2Index]));
-                ({ blast: state.p2Blasts![state.p2Index], otherBlast: state.p1Blasts[state.p1Index]! } = applyStatusEffectAtEndOfTurn(state.p2Blasts![state.p2Index], state.p1Blasts[state.p1Index]!));
+            const p1Played = state.turnStateData.p1TurnData.type !== TurnType.None;
 
-                state = checkIfMatchContinue(state);
+            if (p1Played) {
+                state.player1State = PlayerState.Busy;
+                state.player2State = PlayerState.Busy;
 
-                if (state.battleState == BattleState.End) {
-                    if (isBlastAlive(state.p2Blasts![state.p2Index])) state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
-                    if (isBlastAlive(state.p1Blasts[state.p1Index]!)) state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
+                state.battleState = BattleState.ResolveTurn;
+            }
+            break;
 
-                    dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
 
-                    return;
-                }
-                else if (state.battleState == BattleState.WaitForPlayerSwap) {
-                    state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+        case BattleState.ResolveTurn:
 
-                    dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
+            switch (state.turnStateData.p1TurnData.type) {
+                // region Attack
+                case TurnType.Attack:
+                    state.turnStateData.p1TurnData.index = clamp(state.turnStateData.p1TurnData.index, 0, 3);
+                    let move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![state.turnStateData.p1TurnData.index]);
 
-                    EndLoopDebug(logger, state);
+                    if (move == null) {
+                        ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready);
+                        break;
+                    }
 
-                    return;
-                }
-                else {
-                    state.battleState = BattleState.Waiting;
+                    let moveIndex = state.turnStateData.p2TurnData.index;
+                    if (moveIndex === -1) {
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
 
-                    state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
-                    state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+                        executePlayerAttack(true, state, logger, dispatcher);
 
-                    //Send matchTurn
-                    dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
-                }
+                    } else {
+
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+
+                        performAttackSequence(state, dispatcher, nk, logger);
+                    }
+
+                    break;
+                //region Player Use Item
+                case TurnType.Item:
+                    let msgItem = {} as ItemUseJSON;
+                    msgItem = state.turnStateData.p1TurnData.itemUse!;
+                    msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
+                    let item = state.player1Items[msgItem.index_item];
+
+                    if (item == null) {
+                        ErrorFunc(state, "Item to use is null", dispatcher, BattleState.Ready);
+                        break;
+                    }
+
+                    if (item.amount <= 0) {
+                        ErrorFunc(state, "U don't have enough item", dispatcher, BattleState.Ready);
+                        break;
+                    }
+
+                    useItem(nk, logger, state.player1Id, item);
+
+                    var itemData = getItemDataById(item.data_id);
+
+                    switch (itemData.behaviour) {
+                        case ITEM_BEHAVIOUR.Heal:
+                            state.p1Blasts[msgItem.index_blast] = healHealthBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
+                            break;
+                        case ITEM_BEHAVIOUR.Mana:
+                            state.p1Blasts[msgItem.index_blast] = healManaBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
+                            break;
+                        case ITEM_BEHAVIOUR.Status:
+                            state.p1Blasts[msgItem.index_blast] = healStatusBlast(state.p1Blasts[msgItem.index_blast], itemData.status!);
+                            break;
+                        case ITEM_BEHAVIOUR.Catch:
+                            var wildBlastCaptured = false;
+
+                            wildBlastCaptured = isBlastCaptured(state.p2Blasts![state.p2Index].hp, state.p2Blasts![state.p2Index].maxHp, getBlastDataById(state.p2Blasts![state.p2Index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
+
+                            if (wildBlastCaptured) {
+                                logger.debug('Wild blast Captured !', wildBlastCaptured);
+
+                                state.battleState = BattleState.End;
+                            }
+
+                            state.turnStateData.catched = wildBlastCaptured;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (state.turnStateData.p2TurnData.index === -1) {
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
+                    } else {
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+                        executePlayerAttack(false, state, logger, dispatcher);
+                    }
+                    break;
+                // region Player Change
+                case TurnType.Swap:
+                    var msgChangeBlast = clamp(state.turnStateData.p1TurnData.index, 0, state.p1Blasts.length - 1);
+
+                    if (state.p1Index == msgChangeBlast) {
+                        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
+                        break;
+                    }
+
+                    if (!isBlastAlive(state.p1Blasts[msgChangeBlast])) {
+                        ErrorFunc(state, "Cannot change actual blast with dead blast in Ready", dispatcher, BattleState.Ready);
+                        break;
+                    }
+
+                    state.p1Index = msgChangeBlast;
+
+                    if (state.turnStateData.p2TurnData.index === -1) {
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
+                    } else {
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+                        executePlayerAttack(false, state, logger, dispatcher);
+                    } break;
+                // region Player Wait
+                case TurnType.Wait:
+                    state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, true);
+
+                    if (state.turnStateData.p2TurnData.index === -1) {
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
+                    } else {
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+                        executePlayerAttack(false, state, logger, dispatcher);
+                    } break;
+            }
+
+            // region End turn Logic
+
+            ({ blast: state.p1Blasts[state.p1Index]!, otherBlast: state.p2Blasts![state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index]!, state.p2Blasts![state.p2Index]));
+            ({ blast: state.p2Blasts![state.p2Index], otherBlast: state.p1Blasts[state.p1Index]! } = applyStatusEffectAtEndOfTurn(state.p2Blasts![state.p2Index], state.p1Blasts[state.p1Index]!));
+
+            checkIfMatchContinue(state);
+
+            if (state.battleState == BattleState.End) {
+                if (isBlastAlive(state.p2Blasts![state.p2Index])) state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+                if (isBlastAlive(state.p1Blasts[state.p1Index]!)) state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
+
+                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
+
+                break;
+            }
+            else if ((state.battleState as BattleState) === BattleState.WaitForPlayerSwap) {
+
+                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+
+                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
 
                 EndLoopDebug(logger, state);
-            });
+
+                break;
+            }
+            else {
+                state.battleState = BattleState.Waiting;
+
+                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
+                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+
+                //Send matchTurn
+                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
+            }
+
+            EndLoopDebug(logger, state);
+
             break;
         // region WAIT_FOR_PLAYER_SWAP
         case BattleState.WaitForPlayerSwap:
@@ -437,7 +463,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 ];
 
                 if (!validOpCodes.includes(message.opCode)) {
-                    ({ state } = ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.WaitForPlayerSwap));
+                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.WaitForPlayerSwap);
                     return;
                 }
 
@@ -466,7 +492,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     }
 
                     if (!isBlastAlive(state.p1Blasts[msgChangeBlast])) {
-                        ({ state } = ErrorFunc(state, "Cannot change actual blast with dead blast", dispatcher, BattleState.WaitForPlayerSwap));
+                        ErrorFunc(state, "Cannot change actual blast with dead blast", dispatcher, BattleState.WaitForPlayerSwap);
                         return;
                     }
 
@@ -489,7 +515,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 ];
 
                 if (!validOpCodes.includes(message.opCode)) {
-                    ({ state } = ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.WaitForPlayerChooseOffer));
+                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.WaitForPlayerChooseOffer);
                     return;
                 }
 
@@ -718,7 +744,7 @@ function GetNewWildBlast(state: PvEBattleData, nk: nkruntime.Nakama, logger: nkr
 }
 
 
-function ErrorFunc(state: PvEBattleData, error: string, dispatcher: nkruntime.MatchDispatcher, currentBattleState: BattleState) {
+function ErrorFunc(state: BattleData, error: string, dispatcher: nkruntime.MatchDispatcher, currentBattleState: BattleState) {
     state.battleState = currentBattleState;
     state.player1State = PlayerState.Ready;
 
@@ -767,7 +793,6 @@ interface AttackContext {
     setMoveEffect: (effects: MoveEffectData[]) => void;
     meteo: Meteo;
     dispatcher: nkruntime.MatchDispatcher;
-    isPlayer: boolean;
 }
 
 function ExecuteAttack(ctx: AttackContext, logger: nkruntime.Logger): void {
@@ -817,36 +842,6 @@ function ExecuteAttack(ctx: AttackContext, logger: nkruntime.Logger): void {
     return;
 }
 
-
-function executePlayerAttack(
-    state: PvEBattleData,
-    move: Move,
-    dispatcher: nkruntime.MatchDispatcher,
-    logger: nkruntime.Logger
-): { state: PvEBattleData } {
-    const player1Index = state.p1Index;
-    const player2Index = state.p2Index;
-
-    ExecuteAttack({
-        move,
-        attacker: state.p1Blasts[player1Index]!,
-        defender: state.p2Blasts![player2Index],
-        attackerPlatforms: state.player1Platform,
-        setAttacker: b => state.p1Blasts[player1Index] = b,
-        setDefender: b => state.p2Blasts[player2Index] = b,
-        getTurnData: () => state.turnStateData.p1TurnData,
-        setMoveDamage: dmg => state.turnStateData.p1TurnData.moveDamage = dmg,
-        setMoveEffect: eff => state.turnStateData.p1TurnData.moveEffects = eff,
-        meteo: state.meteo,
-        dispatcher,
-        isPlayer: true,
-    }, logger);
-
-    state.turnStateData.p1TurnData.type = TurnType.Attack;
-    return { state };
-}
-
-
 function ApplyMoveEffects(
     move: Move,
     getTargetBlast: () => BlastEntity,
@@ -884,98 +879,6 @@ function ApplyMoveEffects(
     }
 
     return effectsThisTurn;
-}
-
-function executeWildBlastAttack(
-    state: PvEBattleData,
-    dispatcher: nkruntime.MatchDispatcher,
-    logger: nkruntime.Logger
-): { state: PvEBattleData } {
-
-    const moveIndex = state.turnStateData.p2TurnData.moveIndex;
-    if (moveIndex === -1) {
-        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(
-            state.p2Blasts![state.p2Index].maxMana,
-            state.p2Blasts![state.p2Index].mana,
-            true
-        );
-        state.turnStateData.p2TurnData.type = TurnType.Wait;
-        return { state };
-    }
-
-    const move = getMoveById(state.p2Blasts![state.p2Index].activeMoveset![moveIndex]);
-
-    ExecuteAttack({
-        move,
-        attacker: state.p2Blasts![state.p2Index],
-        defender: state.p1Blasts[state.p1Index]!,
-        attackerPlatforms: state.player2Platform,
-        setAttacker: b => state.p2Blasts![state.p2Index] = b,
-        setDefender: b => state.p1Blasts[state.p1Index] = b,
-        getTurnData: () => state.turnStateData.p2TurnData,
-        setMoveDamage: dmg => state.turnStateData.p2TurnData.moveDamage = dmg,
-        setMoveEffect: eff => state.turnStateData.p2TurnData.moveEffects = eff,
-        meteo: state.meteo,
-        dispatcher,
-        isPlayer: false,
-    }, logger);
-    state.turnStateData.p2TurnData.type = TurnType.Attack;
-    return { state };
-}
-
-function handleAttackTurn(isPlayerFaster: boolean, state: PvEBattleData, move: Move, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): { state: PvEBattleData } {
-    ({ state } = isPlayerFaster ? executePlayerAttack(state, move, dispatcher, logger) : executeWildBlastAttack(state, dispatcher, logger));
-
-    state = checkIfMatchContinue(state);
-
-    return { state };
-}
-
-function performAttackSequence(state: PvEBattleData, playerMove: Move, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): PvEBattleData {
-
-    let firstIsPlayer: boolean;
-
-    if (state.turnStateData.p2TurnData.moveIndex >= 0) {
-        const wildMoveId = state.p2Blasts![state.p2Index].activeMoveset![state.turnStateData.p2TurnData.moveIndex];
-        const wildMove = getMoveById(wildMoveId);
-
-        if (playerMove.priority == wildMove.priority) {
-            firstIsPlayer = getFasterBlast(state.p1Blasts[state.p1Index]!, state.p2Blasts![state.p2Index]);
-        } else {
-            firstIsPlayer = playerMove.priority > wildMove.priority;
-        }
-
-    } else {
-        firstIsPlayer = true;
-    }
-
-    ({ state } = handleAttackTurn(firstIsPlayer, state, playerMove, dispatcher, nk, logger));
-
-    if (state.battleState === BattleState.Ready) {
-        ({ state } = handleAttackTurn(!firstIsPlayer, state, playerMove, dispatcher, nk, logger));
-    }
-
-    return state;
-}
-
-function checkIfMatchContinue(state: PvEBattleData): PvEBattleData {
-
-    const playerBlast = state.p1Blasts[state.p1Index]!;
-    const wildBlast = state.p2Blasts![state.p2Index];
-
-    const wildAlive = isBlastAlive(wildBlast);
-    const playerAlive = isBlastAlive(playerBlast);
-    const allPlayerDead = isAllBlastDead(state.p1Blasts);
-
-    if (!wildAlive) {
-        state.battleState = BattleState.End;
-    } else if (allPlayerDead) {
-        state.battleState = BattleState.End;
-    } else if (!playerAlive) {
-        state.battleState = BattleState.WaitForPlayerSwap;
-    }
-
-    return state;
 }
 
 

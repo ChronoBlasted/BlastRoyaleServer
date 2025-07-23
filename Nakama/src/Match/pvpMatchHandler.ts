@@ -58,14 +58,14 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         turnStateData: {
             p1TurnData: {
                 type: TurnType.None,
-                moveIndex: 0,
+                index: 0,
                 moveDamage: 0,
                 moveEffects: [],
             },
 
             p2TurnData: {
                 type: TurnType.None,
-                moveIndex: 0,
+                index: 0,
                 moveDamage: 0,
                 moveEffects: [],
             },
@@ -244,14 +244,14 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 state.turnStateData.p1TurnData = {
                     type: TurnType.None,
-                    moveIndex: 0,
+                    index: 0,
                     moveDamage: 0,
                     moveEffects: [],
                 }
 
                 state.turnStateData.p2TurnData = {
                     type: TurnType.None,
-                    moveIndex: 0,
+                    index: 0,
                     moveDamage: 0,
                     moveEffects: [],
                 }
@@ -267,15 +267,17 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 const action: PlayerActionData = {
                     type: parsed.type,
-                    data: parsed.data,
+                    data: parsed.data ?? 0,
                 };
 
                 if (userId === state.player1Id) {
-                    state.turnStateData.p1TurnData.type = action.type;
+                    state.turnStateData.p1TurnData.type = parseEnum(action.type.toString(), TurnType);
+                    state.turnStateData.p1TurnData.index = action.data;
                 }
 
                 if (userId === state.player2Id) {
-                    state.turnStateData.p2TurnData.type = action.type;
+                    state.turnStateData.p2TurnData.type = parseEnum(action.type.toString(), TurnType);
+                    state.turnStateData.p2TurnData.index = action.data;
                 }
             }
 
@@ -303,28 +305,91 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 state.battleState = BattleState.ResolveTurn;
                 state.turnTimer = null;
-
-                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]!]);
-
-                const reversedTurnStateData = {
-                    p1TurnData: state.turnStateData.p2TurnData,
-                    p2TurnData: state.turnStateData.p1TurnData,
-                    catched: state.turnStateData.catched
-                };
-
-                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]!]);
             }
             break;
-        case BattleState.ResolveTurn:
 
-            if (state.turnStateData.p1TurnData.type === TurnType.Wait && state.turnStateData.p2TurnData.type === TurnType.Wait) {
-                logger.debug("Both players waited, resolving turn...");
+        case BattleState.ResolveTurn: {
+            logger.debug("Resolving turn: P1 Action: %s, P2 Action: %s", state.turnStateData.p1TurnData.type, state.turnStateData.p2TurnData.type);
+
+            const p1 = state.turnStateData.p1TurnData;
+            const p2 = state.turnStateData.p2TurnData;
+
+            if (p1.type === TurnType.Swap) {
+                if (trySwapBlast(state.p1Index, p1, state.p1Blasts, i => state.p1Index = i, state, dispatcher)) break;
             }
+
+            if (p2.type === TurnType.Swap) {
+                if (trySwapBlast(state.p2Index, p2, state.p2Blasts, i => state.p2Index = i, state, dispatcher)) break;
+            }
+
+            if (p1.type === TurnType.Attack) {
+                p1.index = clamp(p1.index, 0, 3);
+                const move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![p1.index]);
+                if (!move) {
+                    ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready);
+                    break;
+                }
+            }
+
+            if (p2.type === TurnType.Attack) {
+                p2.index = clamp(p2.index, 0, 3);
+                const move = getMoveById(state.p2Blasts[state.p2Index]!.activeMoveset![p2.index]);
+                if (!move) {
+                    ErrorFunc(state, "Player 2 move null", dispatcher, BattleState.Ready);
+                    break;
+                }
+            }
+
+            if (p1.type === TurnType.Attack && p2.type === TurnType.Attack) {
+                performAttackSequence(state, dispatcher, nk, logger);
+            } else if (p1.type === TurnType.Attack) {
+                executePlayerAttack(true, state, logger, dispatcher);
+            } else if (p2.type === TurnType.Attack) {
+                executePlayerAttack(false, state, logger, dispatcher);
+            }
+
+            if (p1.type === TurnType.Wait) {
+                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, true);
+            }
+
+            if (p2.type === TurnType.Wait) {
+                state.p2Blasts[state.p2Index]!.mana = calculateManaRecovery(state.p2Blasts[state.p2Index]!.maxMana, state.p2Blasts[state.p2Index]!.mana, true);
+            }
+
+            ({ blast: state.p1Blasts[state.p1Index]!, otherBlast: state.p2Blasts![state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index]!, state.p2Blasts![state.p2Index]));
+            ({ blast: state.p2Blasts![state.p2Index], otherBlast: state.p1Blasts[state.p1Index]! } = applyStatusEffectAtEndOfTurn(state.p2Blasts![state.p2Index], state.p1Blasts[state.p1Index]!));
+
+            checkIfMatchContinue(state);
+
+            if (isBlastAlive(state.p2Blasts![state.p2Index])) {
+                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+            }
+
+            if (isBlastAlive(state.p1Blasts[state.p1Index]!)) {
+                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
+            }
+
+            EndLoopDebug(logger, state);
+
+            dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]!]);
+
+            const reversedTurnStateData = {
+                p1TurnData: state.turnStateData.p2TurnData,
+                p2TurnData: state.turnStateData.p1TurnData,
+                catched: state.turnStateData.catched
+            };
+
+            dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]!]);
 
             state.battleState = BattleState.Waiting;
 
             break;
+        }
+
         case BattleState.WaitForPlayerSwap:
+
+            logger.debug("Waiting for player swap");
+
             break;
         case BattleState.End:
 

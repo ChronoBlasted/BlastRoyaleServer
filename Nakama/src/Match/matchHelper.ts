@@ -49,13 +49,15 @@ interface BattleData {
     p2Blasts: BlastEntity[];
     player2Platform: Type[];
 
-    turnStateData: {
-        p1TurnData: PlayerTurnData,
-        p2TurnData: PlayerTurnData,
-        catched: boolean;
-    }
+    turnStateData: TurnStateData;
 
     meteo: Meteo
+}
+
+interface TurnStateData {
+    p1TurnData: PlayerTurnData,
+    p2TurnData: PlayerTurnData,
+    catched: boolean;
 }
 
 interface PlayerActionData {
@@ -65,9 +67,10 @@ interface PlayerActionData {
 
 interface PlayerTurnData {
     type: TurnType;
-    moveIndex: number;
+    index: number;
     moveDamage: number;
     moveEffects: MoveEffectData[];
+    itemUse?: ItemUseJSON;
 }
 
 interface StartStateData {
@@ -494,6 +497,158 @@ function getRandomUsableMove(allMoves: Move[], currentMana: number, currentPlatf
 
     const randomIndex = Math.floor(Math.random() * usableMoves.length);
     return allMoves.indexOf(usableMoves[randomIndex]);
+}
+
+function compareActionPriorities(p1ActionType: TurnType, p2ActionType: TurnType): boolean {
+    const p1Priority = getActionPriority(p1ActionType);
+    const p2Priority = getActionPriority(p2ActionType);
+
+    return p1Priority >= p2Priority;
+}
+
+function getActionPriority(turnType: TurnType): number {
+    switch (turnType) {
+        case TurnType.Attack:
+            return 2;
+        case TurnType.Swap:
+            return 4;
+        case TurnType.Item:
+            return 3;
+        case TurnType.Wait:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+function performAttackSequence(state: BattleData, dispatcher: nkruntime.MatchDispatcher, nk: nkruntime.Nakama, logger: nkruntime.Logger): BattleData {
+
+    const p1Blast = state.p1Blasts[state.p1Index]!;
+    const p2Blast = state.p2Blasts[state.p2Index]!;
+
+    const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
+    const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
+
+    const p1First = p1Move.priority > p2Move.priority ||
+        (p1Move.priority === p2Move.priority && getFasterBlast(p1Blast, p2Blast));
+
+    logger.debug("P1 Move: %s, P2 Move: %s, P1 First: %s", p1Move.id, p2Move.id, p1First);
+
+    if (p1First) {
+        executePlayerAttack(true, state, logger, dispatcher);
+
+        logger.debug("P1 Attack executed");
+
+        if (state.battleState === BattleState.ResolveTurn) {
+            executePlayerAttack(false, state, logger, dispatcher);
+
+            logger.debug("P2 Attack executed");
+        }
+    } else {
+        executePlayerAttack(false, state, logger, dispatcher);
+
+        logger.debug("P2 Attack executed");
+
+        if (state.battleState === BattleState.ResolveTurn) {
+            executePlayerAttack(true, state, logger, dispatcher);
+            logger.debug("P1 Attack executed");
+        }
+    }
+
+    return state;
+}
+
+function executePlayerAttack(isP1: boolean, state: BattleData, logger: nkruntime.Logger, dispatcher: nkruntime.MatchDispatcher): BattleData {
+
+    const p1Blast = state.p1Blasts[state.p1Index]!;
+    const p2Blast = state.p2Blasts[state.p2Index]!;
+
+    const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
+    const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
+
+    const move = isP1 ? p1Move : p2Move;
+    const attacker = isP1 ? p1Blast : p2Blast;
+    const defender = isP1 ? p2Blast : p1Blast;
+    const attackerPlatform = isP1 ? state.player1Platform : state.player2Platform;
+
+    const setAttacker = (b: BlastEntity) => {
+        if (isP1) state.p1Blasts[state.p1Index] = b;
+        else state.p2Blasts[state.p2Index] = b;
+    };
+    const setDefender = (b: BlastEntity) => {
+        if (isP1) state.p2Blasts[state.p2Index] = b;
+        else state.p1Blasts[state.p1Index] = b;
+    };
+
+    const turnData = isP1 ? state.turnStateData.p1TurnData : state.turnStateData.p2TurnData;
+
+    ExecuteAttack({
+        move,
+        attacker,
+        defender,
+        attackerPlatforms: attackerPlatform,
+        setAttacker,
+        setDefender,
+        getTurnData: () => turnData,
+        setMoveDamage: dmg => turnData.moveDamage = dmg,
+        setMoveEffect: eff => turnData.moveEffects = eff,
+        meteo: state.meteo,
+        dispatcher
+    }, logger);
+
+    state = checkIfMatchContinue(state);
+
+    return state;
+}
+
+function checkIfMatchContinue(state: BattleData): BattleData {
+
+    const playerBlast = state.p1Blasts[state.p1Index]!;
+    const opponentBlast = state.p2Blasts![state.p2Index];
+
+    const opponentAlive = isBlastAlive(opponentBlast);
+    const playerAlive = isBlastAlive(playerBlast);
+
+    const allPlayerDead = isAllBlastDead(state.p1Blasts);
+    const allOpponentDead = isAllBlastDead(state.p2Blasts!);
+
+    if (allOpponentDead) {
+        state.battleState = BattleState.End;
+    } else if (!opponentAlive) {
+        state.battleState = BattleState.WaitForPlayerSwap;
+    } else if (allPlayerDead) {
+        state.battleState = BattleState.End;
+    } else if (!playerAlive) {
+        state.battleState = BattleState.WaitForPlayerSwap;
+    }
+
+    return state;
+}
+
+function trySwapBlast(
+    currentIndex: number,
+    turnData: PlayerTurnData,
+    blasts: BlastEntity[],
+    updateIndex: (newIndex: number) => void,
+    state: BattleData,
+    dispatcher: nkruntime.MatchDispatcher
+): boolean {
+    if (turnData.type !== TurnType.Swap) return false;
+
+    const targetIndex = clamp(turnData.index, 0, blasts.length - 1);
+
+    if (currentIndex === targetIndex) {
+        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
+        return true;
+    }
+
+    if (!isBlastAlive(blasts[targetIndex])) {
+        ErrorFunc(state, "Cannot change actual blast with dead blast in Ready", dispatcher, BattleState.Ready);
+        return true;
+    }
+
+    updateIndex(targetIndex);
+    return false;
 }
 
 // #region Others

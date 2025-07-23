@@ -275,10 +275,21 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 state.turnStateData.catched = false;
 
 
+                // Set state
+
+                const parsed = JSON.parse(nk.binaryToString(message.data));
+
+                const action: PlayerActionData = {
+                    type: parsed.type,
+                    data: parsed.data,
+                };
+
+                state.turnStateData.p1TurnData.type = action.type;
+
                 switch (message.opCode) {
                     // region Attack
                     case OpCodes.PLAYER_ATTACK:
-                        let attackIndex = clamp(JSON.parse(nk.binaryToString(message.data)), 0, 3);
+                        let attackIndex = clamp(action.data, 0, 3);
                         let move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![attackIndex]);
 
                         if (move == null) {
@@ -293,7 +304,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     // region Player Use Item
                     case OpCodes.PLAYER_USE_ITEM:
                         let msgItem = {} as ItemUseJSON;
-                        msgItem = JSON.parse(nk.binaryToString(message.data));
+                        msgItem = JSON.parse(action.data);
                         msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
                         let item = state.player1Items[msgItem.index_item];
 
@@ -343,7 +354,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         break;
                     // region Player Change
                     case OpCodes.PLAYER_CHANGE_BLAST:
-                        var msgChangeBlast = clamp(JSON.parse(nk.binaryToString(message.data)), 0, state.p1Blasts.length - 1);
+                        var msgChangeBlast = clamp(JSON.parse(action.data), 0, state.p1Blasts.length - 1);
 
                         if (state.p1Index == msgChangeBlast) {
                             ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
@@ -434,11 +445,20 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 message.data == null ? logger.debug('Receive Op code : %d', message.opCode) : logger.debug('Receive Op code : %d, with data : %e', message.opCode, JSON.parse(nk.binaryToString(message.data)));
 
+                const parsed = JSON.parse(nk.binaryToString(message.data));
+
+                const action: PlayerActionData = {
+                    type: parsed.type,
+                    data: parsed.data,
+                };
+
+                state.turnStateData.p1TurnData.type = action.type;
+
                 if (message.opCode == OpCodes.PLAYER_CHANGE_BLAST) {
 
                     state.player1State = PlayerState.Busy;
 
-                    var msgChangeBlast = clamp(JSON.parse(nk.binaryToString(message.data)), 0, state.p1Blasts.length - 1);
+                    var msgChangeBlast = clamp(action.data, 0, state.p1Blasts.length - 1);
 
                     if (state.p1Index == msgChangeBlast) {
                         ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.WaitForPlayerSwap);

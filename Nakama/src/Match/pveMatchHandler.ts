@@ -201,6 +201,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             const StartData: StartStateData = {
                 newBlastData: newWildBlast,
                 meteo: state.meteo,
+                turnDelay: 0,
             }
 
             logger.debug('Random blast with id: %d, lvl: %l appeared', state.p2Blasts[state.p2Index].data_id, calculateLevelFromExperience(state.p2Blasts[state.p2Index].exp));

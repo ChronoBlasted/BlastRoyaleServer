@@ -1,8 +1,6 @@
 interface PvPBattleData extends BattleData {
-    turn_timer: number,
-    turn_timer_current: number,
-
-
+    turnDelay: number, // Délai entre les tours en 1 000ms pour 1 seconde
+    turnTimer: number | null, // Timer pour le tour actuel
 }
 
 function rpcFindOrCreatePvPBattle(
@@ -30,6 +28,7 @@ function rpcFindOrCreatePvPBattle(
 }
 
 
+
 const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, params: { [key: string]: string }): { state: PvPBattleData, tickRate: number, label: string } {
 
     const PvPBattleData: PvPBattleData = {
@@ -53,8 +52,8 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
         meteo: Meteo.None,
 
-        turn_timer: 5,
-        turn_timer_current: 0,
+        turnDelay: 3000,
+        turnTimer: null,
 
         turnStateData: {
             p1TurnData: {
@@ -192,11 +191,13 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             const startDataP1: StartStateData = {
                 newBlastData: p1_enemyBlast,
                 meteo: state.meteo,
+                turnDelay: state.turnDelay,
             };
 
             const startDataP2: StartStateData = {
                 newBlastData: p2_enemyBlast,
                 meteo: state.meteo,
+                turnDelay: state.turnDelay,
             };
 
             dispatcher.broadcastMessage(
@@ -236,12 +237,29 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             if (state.player1State === PlayerState.Ready && state.player2State === PlayerState.Ready) {
                 dispatcher.broadcastMessage(OpCodes.ENEMY_READY);
 
-                state.turn_timer_current = state.turn_timer;
-
                 state.battleState = BattleState.Ready;
+
+                state.player1State = PlayerState.Busy;
+                state.player2State = PlayerState.Busy;
+
+                state.turnStateData.p1TurnData = {
+                    type: TurnType.None,
+                    moveIndex: 0,
+                    moveDamage: 0,
+                    moveEffects: [],
+                }
+
+                state.turnStateData.p2TurnData = {
+                    type: TurnType.None,
+                    moveIndex: 0,
+                    moveDamage: 0,
+                    moveEffects: [],
+                }
             }
             break;
         case BattleState.Ready:
+            const now = Date.now();
+
             for (const message of messages) {
                 const userId = message.sender.userId;
 
@@ -254,7 +272,6 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 if (userId === state.player1Id) {
                     state.turnStateData.p1TurnData.type = action.type;
-
                 }
 
                 if (userId === state.player2Id) {
@@ -262,12 +279,15 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 }
             }
 
-            state.turn_timer--;
+            if (!state.turnTimer) {
+                state.turnTimer = now + state.turnDelay;
+            }
 
             const p1Played = state.turnStateData.p1TurnData.type !== TurnType.None;
             const p2Played = state.turnStateData.p2TurnData.type !== TurnType.None;
 
-            if ((p1Played && p2Played) || state.turn_timer <= 0) {
+            if ((p1Played && p2Played) || now >= state.turnTimer) {
+
                 if (!p1Played) {
                     logger.debug("Joueur 1 a dépassé le temps, action = WAIT");
                     state.turnStateData.p1TurnData.type = TurnType.Wait;
@@ -282,9 +302,17 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 state.player2State = PlayerState.Busy;
 
                 state.battleState = BattleState.ResolveTurn;
+                state.turnTimer = null;
 
-                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData.p2TurnData), [state.presences[state.player1Id]!]);
-                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData.p1TurnData), [state.presences[state.player2Id]!]);
+                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]!]);
+
+                const reversedTurnStateData = {
+                    p1TurnData: state.turnStateData.p2TurnData,
+                    p2TurnData: state.turnStateData.p1TurnData,
+                    catched: state.turnStateData.catched
+                };
+
+                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]!]);
             }
             break;
         case BattleState.ResolveTurn:

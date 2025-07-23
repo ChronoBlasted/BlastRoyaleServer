@@ -73,6 +73,7 @@ interface PlayerTurnData {
 interface StartStateData {
     newBlastData: NewBlastData;
     meteo: Meteo;
+    turnDelay: number;
 }
 
 interface NewBlastData {

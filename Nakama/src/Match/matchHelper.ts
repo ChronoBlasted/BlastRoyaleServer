@@ -7,7 +7,9 @@ enum BattleState {
     Waiting,
     Ready,
     ResolveTurn,
-    WaitForPlayerSwap,
+    WaitingForPlayerSwap,
+    ReadyForPlayerSwap,
+    ResolvePlayerSwap,
     WaitForPlayerChooseOffer,
     End,
 }
@@ -74,7 +76,7 @@ interface PlayerTurnData {
 }
 
 interface StartStateData {
-    newBlastData: NewBlastData;
+    newBlastSquad: Blast[];
     meteo: Meteo;
     turnDelay: number;
 }
@@ -420,6 +422,11 @@ function isBlastAlive(blast: BlastEntity): boolean {
     return blast.hp > 0;
 }
 
+function getFirstAliveBlastIndex(allPlayerBlasts: BlastEntity[]): number {
+    return allPlayerBlasts.findIndex(blast => isBlastAlive(blast));
+}
+
+
 function calculateManaRecovery(
     maxMana: number,
     currentMana: number,
@@ -596,7 +603,7 @@ function executePlayerAttack(isP1: boolean, state: BattleData, logger: nkruntime
         dispatcher
     }, logger);
 
-    state = checkIfMatchContinue(state);
+    checkIfMatchContinue(state);
 
     return state;
 }
@@ -615,11 +622,11 @@ function checkIfMatchContinue(state: BattleData): BattleData {
     if (allOpponentDead) {
         state.battleState = BattleState.End;
     } else if (!opponentAlive) {
-        state.battleState = BattleState.WaitForPlayerSwap;
+        state.battleState = BattleState.WaitingForPlayerSwap;
     } else if (allPlayerDead) {
         state.battleState = BattleState.End;
     } else if (!playerAlive) {
-        state.battleState = BattleState.WaitForPlayerSwap;
+        state.battleState = BattleState.WaitingForPlayerSwap;
     }
 
     return state;
@@ -633,8 +640,6 @@ function trySwapBlast(
     state: BattleData,
     dispatcher: nkruntime.MatchDispatcher
 ): boolean {
-    if (turnData.type !== TurnType.Swap) return false;
-
     const targetIndex = clamp(turnData.index, 0, blasts.length - 1);
 
     if (currentIndex === targetIndex) {
@@ -650,6 +655,7 @@ function trySwapBlast(
     updateIndex(targetIndex);
     return false;
 }
+
 
 // #region Others
 

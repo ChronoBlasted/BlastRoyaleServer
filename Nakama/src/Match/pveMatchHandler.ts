@@ -186,20 +186,10 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             state.p2Index = 0;
             state.p2Blasts = [ConvertBlastToBlastEntity(newBlast)];
 
-            const newWildBlast: NewBlastData = {
-                id: state.p2Blasts[state.p2Index].data_id,
-                exp: state.p2Blasts[state.p2Index].exp,
-                iv: state.p2Blasts[state.p2Index].iv,
-                boss: state.p2Blasts[state.p2Index].boss,
-                shiny: state.p2Blasts[state.p2Index].shiny,
-                activeMoveset: state.p2Blasts[state.p2Index].activeMoveset,
-                status: Status.None
-            }
-
             state.meteo = getRandomMeteo();
 
             const StartData: StartStateData = {
-                newBlastData: newWildBlast,
+                newBlastSquad: state.p2Blasts,
                 meteo: state.meteo,
                 turnDelay: 0,
             }
@@ -422,31 +412,15 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             checkIfMatchContinue(state);
 
+            if (isBlastAlive(state.p2Blasts![state.p2Index])) state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+            if (isBlastAlive(state.p1Blasts[state.p1Index]!)) state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
+
             if (state.battleState == BattleState.End) {
-                if (isBlastAlive(state.p2Blasts![state.p2Index])) state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
-                if (isBlastAlive(state.p1Blasts[state.p1Index]!)) state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
-
                 dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
-
-                break;
-            }
-            else if ((state.battleState as BattleState) === BattleState.WaitForPlayerSwap) {
-
-                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
-
-                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
-
-                EndLoopDebug(logger, state);
-
-                break;
             }
             else {
                 state.battleState = BattleState.Waiting;
 
-                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
-                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
-
-                //Send matchTurn
                 dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
             }
 
@@ -454,7 +428,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             break;
         // region WAIT_FOR_PLAYER_SWAP
-        case BattleState.WaitForPlayerSwap:
+        case BattleState.ResolvePlayerSwap:
 
             messages.forEach(function (message) {
 
@@ -463,7 +437,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 ];
 
                 if (!validOpCodes.includes(message.opCode)) {
-                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.WaitForPlayerSwap);
+                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.ResolvePlayerSwap);
                     return;
                 }
 
@@ -487,12 +461,12 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     var msgChangeBlast = clamp(action.data, 0, state.p1Blasts.length - 1);
 
                     if (state.p1Index == msgChangeBlast) {
-                        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.WaitForPlayerSwap);
+                        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.ResolvePlayerSwap);
                         return;
                     }
 
                     if (!isBlastAlive(state.p1Blasts[msgChangeBlast])) {
-                        ErrorFunc(state, "Cannot change actual blast with dead blast", dispatcher, BattleState.WaitForPlayerSwap);
+                        ErrorFunc(state, "Cannot change actual blast with dead blast", dispatcher, BattleState.ResolvePlayerSwap);
                         return;
                     }
 

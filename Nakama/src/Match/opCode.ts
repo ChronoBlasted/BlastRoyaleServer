@@ -12,7 +12,8 @@ enum OpCodes {
 
     NEW_BATTLE_TURN = 60,
     PLAYER_MUST_CHANGE_BLAST = 61,
-    
+    PLAYER_READY_MUST_CHANGE = 62,
+
     NEW_OFFER_TURN = 80,
     PLAYER_CHOOSE_OFFER = 81,
     

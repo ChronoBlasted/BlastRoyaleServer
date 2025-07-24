@@ -52,7 +52,7 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
         meteo: Meteo.None,
 
-        turnDelay: 3000,
+        turnDelay: 5000,
         turnTimer: null,
 
         turnStateData: {
@@ -76,7 +76,7 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
     return {
         state: PvPBattleData,
-        tickRate: 1, // 1 tick per second = 1 MatchLoop func invocations per second
+        tickRate: 2, // 1 tick per second = 1 MatchLoop func invocations per second
         label: ''
     };
 };
@@ -168,34 +168,14 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             state.meteo = getRandomMeteo();
 
-            const p1_enemyBlast: NewBlastData = {
-                id: state.p2Blasts[state.p2Index].data_id,
-                exp: state.p2Blasts[state.p2Index].exp,
-                iv: state.p2Blasts[state.p2Index].iv,
-                boss: state.p2Blasts[state.p2Index].boss,
-                shiny: state.p2Blasts[state.p2Index].shiny,
-                activeMoveset: state.p2Blasts[state.p2Index].activeMoveset,
-                status: Status.None,
-            };
-
-            const p2_enemyBlast: NewBlastData = {
-                id: state.p1Blasts[state.p1Index].data_id,
-                exp: state.p1Blasts[state.p1Index].exp,
-                iv: state.p1Blasts[state.p1Index].iv,
-                boss: state.p1Blasts[state.p1Index].boss,
-                shiny: state.p1Blasts[state.p1Index].shiny,
-                activeMoveset: state.p1Blasts[state.p1Index].activeMoveset,
-                status: Status.None,
-            };
-
             const startDataP1: StartStateData = {
-                newBlastData: p1_enemyBlast,
+                newBlastSquad: state.p2Blasts,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
             };
 
             const startDataP2: StartStateData = {
-                newBlastData: p2_enemyBlast,
+                newBlastSquad: state.p1Blasts,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
             };
@@ -213,11 +193,11 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             );
 
             state.battleState = BattleState.Waiting;
-
-            logger.debug('______________ END START BATTLE ______________');
             break;
 
         case BattleState.Waiting:
+            logger.debug('______________ START WAITING ______________');
+
             messages.forEach(function (message) {
                 switch (message.opCode) {
                     case OpCodes.PLAYER_READY:
@@ -258,6 +238,9 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             }
             break;
         case BattleState.Ready:
+
+            logger.debug('______________ START READY ______________');
+
             const now = Date.now();
 
             for (const message of messages) {
@@ -303,12 +286,18 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 state.player1State = PlayerState.Busy;
                 state.player2State = PlayerState.Busy;
 
-                state.battleState = BattleState.ResolveTurn;
+                if (!isBlastAlive(state.p1Blasts[state.p1Index]) || !isBlastAlive(state.p2Blasts[state.p2Index])) {
+                    state.battleState = BattleState.ResolvePlayerSwap;
+                } else {
+                    state.battleState = BattleState.ResolveTurn;
+                }
+
                 state.turnTimer = null;
             }
             break;
 
         case BattleState.ResolveTurn: {
+            logger.debug('______________ START RESOLVE TURN ______________');
             logger.debug("Resolving turn: P1 Action: %s, P2 Action: %s", state.turnStateData.p1TurnData.type, state.turnStateData.p2TurnData.type);
 
             const p1 = state.turnStateData.p1TurnData;
@@ -369,29 +358,160 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
             }
 
+            SendTurnState(dispatcher, state, OpCodes.NEW_BATTLE_TURN);
+
+            if ((state.battleState as BattleState) !== BattleState.End && (state.battleState as BattleState) !== BattleState.WaitingForPlayerSwap) { state.battleState = BattleState.Waiting; }
+
+
             EndLoopDebug(logger, state);
 
-            dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]!]);
+            break;
+        }
 
-            const reversedTurnStateData = {
-                p1TurnData: state.turnStateData.p2TurnData,
-                p2TurnData: state.turnStateData.p1TurnData,
-                catched: state.turnStateData.catched
-            };
+        case BattleState.WaitingForPlayerSwap:
+            logger.debug('______________ START WAITING FOR PLAYER SWAP ______________');
 
-            dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]!]);
+            messages.forEach(function (message) {
+                switch (message.opCode) {
+                    case OpCodes.PLAYER_READY:
+                        const userId = message.sender.userId;
+
+                        if (userId === state.player1Id) {
+                            state.player1State = PlayerState.Ready;
+                            logger.debug("P1 Ready");
+                        } else if (userId === state.player2Id) {
+                            state.player2State = PlayerState.Ready;
+                            logger.debug("P2 Ready");
+                        }
+                        break;
+                }
+            });
+
+            if (state.player1State === PlayerState.Ready && state.player2State === PlayerState.Ready) {
+                dispatcher.broadcastMessage(OpCodes.PLAYER_READY_MUST_CHANGE);
+
+                state.battleState = BattleState.ReadyForPlayerSwap;
+
+                state.player1State = PlayerState.Busy;
+                state.player2State = PlayerState.Busy;
+
+                state.turnStateData.p1TurnData = {
+                    type: TurnType.None,
+                    index: 0,
+                    moveDamage: 0,
+                    moveEffects: [],
+                }
+
+                state.turnStateData.p2TurnData = {
+                    type: TurnType.None,
+                    index: 0,
+                    moveDamage: 0,
+                    moveEffects: [],
+                }
+            }
+            break;
+
+        case BattleState.ReadyForPlayerSwap: {
+            logger.debug('______________ START READY FOR PLAYER SWAP ______________');
+
+            const now = Date.now();
+
+            for (const message of messages) {
+
+                const validOpCodes = [
+                    OpCodes.PLAYER_CHANGE_BLAST,
+                ];
+
+                if (!validOpCodes.includes(message.opCode)) {
+                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.ResolvePlayerSwap);
+                    break;
+                }
+
+                const userId = message.sender.userId;
+
+                const parsed = JSON.parse(nk.binaryToString(message.data));
+
+                const action: PlayerActionData = {
+                    type: parseEnum(parsed.type.toString(), TurnType),
+                    data: parsed.data ?? 0,
+                };
+
+                if (userId === state.player1Id) {
+
+                    if (isBlastAlive(state.p1Blasts[state.p1Index])) {
+                        ErrorFunc(state, "Your blast is alive", dispatcher, BattleState.ReadyForPlayerSwap);
+                        break;
+                    }
+
+                    state.turnStateData.p1TurnData.type = action.type;
+                    state.turnStateData.p1TurnData.index = action.data;
+                }
+
+                if (userId === state.player2Id) {
+
+                    if (isBlastAlive(state.p2Blasts[state.p2Index])) {
+                        ErrorFunc(state, "Your blast is alive", dispatcher, BattleState.ReadyForPlayerSwap);
+                        break;
+                    }
+
+                    state.turnStateData.p2TurnData.type = action.type;
+                    state.turnStateData.p2TurnData.index = action.data;
+                }
+            }
+
+            if (!state.turnTimer) {
+                state.turnTimer = now + state.turnDelay;
+            }
+
+            const p1Ready = isBlastAlive(state.p1Blasts[state.p1Index]) || state.turnStateData.p1TurnData.type === TurnType.Swap;
+            const p2Ready = isBlastAlive(state.p2Blasts[state.p2Index]) || state.turnStateData.p2TurnData.type === TurnType.Swap;
+
+            if (now >= state.turnTimer || (p1Ready && p2Ready)) {
+
+                let firstIndex = 0;
+
+                if (!isBlastAlive(state.p1Blasts[state.p1Index]) && state.turnStateData.p1TurnData.type != TurnType.Swap) {
+                    state.turnStateData.p1TurnData.type = TurnType.Swap;
+                    state.player1State = PlayerState.Busy;
+                    firstIndex = getFirstAliveBlastIndex(state.p1Blasts);
+                    state.turnStateData.p1TurnData.index = firstIndex;
+                }
+
+                if (!isBlastAlive(state.p2Blasts[state.p2Index]) && state.turnStateData.p2TurnData.type != TurnType.Swap) {
+                    state.turnStateData.p2TurnData.type = TurnType.Swap;
+                    state.player2State = PlayerState.Busy;
+                    firstIndex = getFirstAliveBlastIndex(state.p2Blasts);
+                    state.turnStateData.p2TurnData.index = firstIndex;
+                }
+
+                state.battleState = BattleState.ResolvePlayerSwap;
+                state.turnTimer = null;
+            }
+
+            break;
+        }
+        case BattleState.ResolvePlayerSwap: {
+            logger.debug('______________ START WAIT FOR PLAYER SWAP ______________');
+
+            const p1 = state.turnStateData.p1TurnData;
+            const p2 = state.turnStateData.p2TurnData;
+
+            if (p1.type === TurnType.Swap) {
+                if (trySwapBlast(state.p1Index, p1, state.p1Blasts, i => state.p1Index = i, state, dispatcher)) break;
+            }
+
+            if (p2.type === TurnType.Swap) {
+                if (trySwapBlast(state.p2Index, p2, state.p2Blasts, i => state.p2Index = i, state, dispatcher)) break;
+            }
+
+            SendTurnState(dispatcher, state, OpCodes.PLAYER_MUST_CHANGE_BLAST);
 
             state.battleState = BattleState.Waiting;
 
             break;
         }
-
-        case BattleState.WaitForPlayerSwap:
-
-            logger.debug("Waiting for player swap");
-
-            break;
         case BattleState.End:
+            logger.debug('______________ START END ______________');
 
             const allP1BlastFainted = isAllBlastDead(state.p1Blasts);
             const allP2BlastFainted = isAllBlastDead(state.p2Blasts);
@@ -427,8 +547,6 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 return null;
             }
-
-            logger.debug('______________ END BATTLE ______________');
     }
 
     if (ConnectedPlayers(state) === 0) {
@@ -460,6 +578,18 @@ const PvPmatchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Lo
     return {
         state
     };
+}
+
+function SendTurnState(dispatcher: nkruntime.MatchDispatcher, state: PvPBattleData, OpCodes: OpCodes) {
+    dispatcher.broadcastMessage(OpCodes, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]!]);
+
+    const reversedTurnStateData = {
+        p1TurnData: state.turnStateData.p2TurnData,
+        p2TurnData: state.turnStateData.p1TurnData,
+        catched: state.turnStateData.catched
+    };
+
+    dispatcher.broadcastMessage(OpCodes, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]!]);
 }
 
 function PvPPlayerLeave(nk: nkruntime.Nakama, state: PvPBattleData, logger: nkruntime.Logger) {

@@ -4144,14 +4144,18 @@ function performAttackSequence(state, dispatcher, nk, logger) {
     logger.debug("P1 Move: %s, P2 Move: %s, P1 First: %s", p1Move.id, p2Move.id, p1First);
     if (p1First) {
         executePlayerAttack(true, state, logger, dispatcher);
+        logger.debug("P1 Attack executed");
         if (state.battleState === BattleState.ResolveTurn) {
             executePlayerAttack(false, state, logger, dispatcher);
+            logger.debug("P2 Attack executed");
         }
     }
     else {
         executePlayerAttack(false, state, logger, dispatcher);
+        logger.debug("P2 Attack executed");
         if (state.battleState === BattleState.ResolveTurn) {
             executePlayerAttack(true, state, logger, dispatcher);
+            logger.debug("P1 Attack executed");
         }
     }
     return state;
@@ -4473,7 +4477,16 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                         ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready);
                         break;
                     }
-                    performAttackSequence(state, dispatcher, nk, logger);
+                    let moveIndex = state.turnStateData.p2TurnData.index;
+                    if (moveIndex === -1) {
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
+                        executePlayerAttack(true, state, logger, dispatcher);
+                    }
+                    else {
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+                        performAttackSequence(state, dispatcher, nk, logger);
+                    }
                     break;
                 //region Player Use Item
                 case TurnType.Item:
@@ -4511,9 +4524,16 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                             state.turnStateData.catched = wildBlastCaptured;
                             break;
                         default:
+                            break;
                     }
-                    state.turnStateData.p1TurnData.type = TurnType.Item;
-                    executePlayerAttack(false, state, logger, dispatcher);
+                    if (state.turnStateData.p2TurnData.index === -1) {
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
+                    }
+                    else {
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+                        executePlayerAttack(false, state, logger, dispatcher);
+                    }
                     break;
                 // region Player Change
                 case TurnType.Swap:
@@ -4527,12 +4547,26 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                         break;
                     }
                     state.p1Index = msgChangeBlast;
-                    executePlayerAttack(false, state, logger, dispatcher);
+                    if (state.turnStateData.p2TurnData.index === -1) {
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
+                    }
+                    else {
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+                        executePlayerAttack(false, state, logger, dispatcher);
+                    }
                     break;
                 // region Player Wait
                 case TurnType.Wait:
                     state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, true);
-                    executePlayerAttack(false, state, logger, dispatcher);
+                    if (state.turnStateData.p2TurnData.index === -1) {
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.turnStateData.p2TurnData.type = TurnType.Wait;
+                    }
+                    else {
+                        state.turnStateData.p2TurnData.type = TurnType.Attack;
+                        executePlayerAttack(false, state, logger, dispatcher);
+                    }
                     break;
             }
             // region End turn Logic
@@ -5120,7 +5154,7 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 state.turnTimer = null;
             }
             break;
-        case BattleState.ResolveTurn:
+        case BattleState.ResolveTurn: {
             logger.debug("Resolving turn: P1 Action: %s, P2 Action: %s", state.turnStateData.p1TurnData.type, state.turnStateData.p2TurnData.type);
             const p1 = state.turnStateData.p1TurnData;
             const p2 = state.turnStateData.p2TurnData;
@@ -5166,12 +5200,13 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             ({ blast: state.p1Blasts[state.p1Index], otherBlast: state.p2Blasts[state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index], state.p2Blasts[state.p2Index]));
             ({ blast: state.p2Blasts[state.p2Index], otherBlast: state.p1Blasts[state.p1Index] } = applyStatusEffectAtEndOfTurn(state.p2Blasts[state.p2Index], state.p1Blasts[state.p1Index]));
             checkIfMatchContinue(state);
-            if (isBlastAlive(state.p2Blasts[state.p2Index]))
+            if (isBlastAlive(state.p2Blasts[state.p2Index])) {
                 state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, false);
-            if (isBlastAlive(state.p1Blasts[state.p1Index]))
+            }
+            if (isBlastAlive(state.p1Blasts[state.p1Index])) {
                 state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, false);
+            }
             EndLoopDebug(logger, state);
-            // Send turn data to both players
             dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]]);
             const reversedTurnStateData = {
                 p1TurnData: state.turnStateData.p2TurnData,
@@ -5181,6 +5216,7 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]]);
             state.battleState = BattleState.Waiting;
             break;
+        }
         case BattleState.WaitForPlayerSwap:
             logger.debug("Waiting for player swap");
             break;

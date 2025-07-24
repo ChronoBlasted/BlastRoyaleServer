@@ -170,12 +170,14 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             const startDataP1: StartStateData = {
                 newBlastSquad: state.p2Blasts,
+                opponentName: player2_presence.username,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
             };
 
             const startDataP2: StartStateData = {
                 newBlastSquad: state.p1Blasts,
+                opponentName: player1_presence.username,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
             };

@@ -77,6 +77,7 @@ interface PlayerTurnData {
 
 interface StartStateData {
     newBlastSquad: Blast[];
+    opponentName: string;
     meteo: Meteo;
     turnDelay: number;
 }

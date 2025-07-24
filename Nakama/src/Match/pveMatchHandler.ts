@@ -190,6 +190,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             const StartData: StartStateData = {
                 newBlastSquad: state.p2Blasts,
+                opponentName: "Wild Blast",
                 meteo: state.meteo,
                 turnDelay: 0,
             }

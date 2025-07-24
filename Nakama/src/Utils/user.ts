@@ -6,25 +6,33 @@ interface PlayerMetadata {
     battle_pass: boolean;
     updated_nickname: boolean;
     area: number;
+    playerStats: PlayerStat;
+    pveBattleButtonAds: boolean;
+    pvpBattleButtonAds: boolean;
+}
+
+interface PlayerStat {
     win: number;
     loose: number;
     blast_catched: number;
     blast_defeated: number;
-    pveBattleButtonAds: boolean;
-    pvpBattleButtonAds: boolean;
 }
 
 const DefaultMetadata: PlayerMetadata = {
     battle_pass: false,
     updated_nickname: false,
     area: 0,
-    win: 0,
-    loose: 0,
-    blast_catched: 0,
-    blast_defeated: 0,
+    playerStats: {
+        win: 0,
+        loose: 0,
+        blast_catched: 0,
+        blast_defeated: 0
+    },
     pveBattleButtonAds: false,
     pvpBattleButtonAds: false,
 };
+
+
 
 function afterAuthenticate(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, data: nkruntime.Session) {
 
@@ -99,9 +107,7 @@ function rpcDeleteAccount(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: 
     return JSON.stringify({ success: true, message: "Account deleted." });
 };
 
-
 // region Metadata
-
 
 function rpcUpdateNicknameStatus(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama) {
     const account = nk.accountGetId(ctx.userId);
@@ -131,14 +137,14 @@ function rpcUpdateNicknameStatus(ctx: nkruntime.Context, logger: nkruntime.Logge
     }
 }
 
-function incrementMetadataStat(nk: nkruntime.Nakama, userId: string, statKey: keyof PlayerMetadata, increment: number) {
+function incrementMetadataStat(nk: nkruntime.Nakama, userId: string, statKey: keyof PlayerStat, increment: number) {
 
     const account = nk.accountGetId(userId);
     const metadata = account.user.metadata as PlayerMetadata;
 
-    (metadata[statKey] as number) = (metadata[statKey] as number) + increment;
+    (metadata.playerStats[statKey] as number) = (metadata.playerStats[statKey] as number) + increment;
 
-    nk.accountUpdateId(userId, "", null, null, null, null, null, metadata);
+    nk.accountUpdateId(userId, null, null, null, null, null, null, metadata);
 }
 
 function setMetadataStat(
@@ -166,7 +172,6 @@ function getMetadataStat(
 }
 
 // endregion Metadata
-
 
 
 function generateFriendCode(nk: nkruntime.Nakama): string {

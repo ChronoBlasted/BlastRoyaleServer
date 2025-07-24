@@ -146,10 +146,10 @@ const Slash: Move = {
 const Cut: Move = {
     id: 8,
     type: Type.Normal,
-    attackType: AttackType.Normal,
+    attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
-    cost: 13,
+    cost: 1,
     priority: 0,
     effects: [],
 };

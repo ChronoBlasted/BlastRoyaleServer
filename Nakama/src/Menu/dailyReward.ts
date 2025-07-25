@@ -101,7 +101,7 @@ function rpcClaimDailyReward(context: nkruntime.Context, logger: nkruntime.Logge
         }
 
         if (reward.coinsReceived != 0) {
-            updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived);
+            updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived,logger);
 
             notification = {
                 code: notificationOpCodes.CURENCY,
@@ -120,7 +120,7 @@ function rpcClaimDailyReward(context: nkruntime.Context, logger: nkruntime.Logge
 
         }
         if (reward.gemsReceived != 0) {
-            updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived);
+            updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived,logger);
 
             notification = {
                 code: notificationOpCodes.CURENCY,

@@ -7,9 +7,9 @@ enum Currency {
 };
 
 enum notificationOpCodes {
-    CURENCY = 1000,
-    BLAST = 1010,
-    ITEM = 1020,
+  CURENCY = 1000,
+  BLAST = 1010,
+  ITEM = 1020,
 }
 
 let DefaultWallet = {
@@ -20,46 +20,50 @@ let DefaultWallet = {
 
 function storeUserWallet(nk: nkruntime.Nakama, user_id: string, changeset: { Coins: number; Gems: number; Trophies: number; }, logger: nkruntime.Logger) {
   try {
-      nk.walletUpdate(user_id, changeset);
+    nk.walletUpdate(user_id, changeset);
   } catch (error) {
-      logger.error('Error storing wallet of player : %s', user_id);
+    logger.error('Error storing wallet of player : %s', user_id);
   }
 }
 
-function updateWalletWithCurrency(nk: nkruntime.Nakama, userId: string, currencyKeyName: Currency, amount: number): nkruntime.WalletUpdateResult {
-  const changeset = {
-    [currencyKeyName]: amount,
-  }
-  let result = nk.walletUpdate(userId, changeset);
+function updateWalletWithCurrency(
+  nk: nkruntime.Nakama,
+  userId: string,
+  currencyKeyName: Currency,
+  amount: number,
+  logger: nkruntime.Logger
+): nkruntime.WalletUpdateResult | null {
+  amount = Math.trunc(amount);
 
-  return result;
+  const currentAmount = getCurrencyInWallet(nk, userId, currencyKeyName) ?? 0;
+
+  if (amount < 0) {
+    const maxRemovable = Math.min(currentAmount, -amount);
+    amount = -maxRemovable;
+  }
+
+  if (amount === 0) {
+    logger.debug("Wallet update skipped: amount is 0 for user %s and currency %s", userId, currencyKeyName);
+    return null;
+  }
+
+
+  return nk.walletUpdate(userId, { [currencyKeyName]: amount });
 }
 
 
-function getCurrencyInWallet(nk: nkruntime.Nakama, userId: string, currencyKeyName: Currency): number {
 
-  var amountToReturn = 0;
 
+function getCurrencyInWallet(
+  nk: nkruntime.Nakama,
+  userId: string,
+  currencyKeyName: Currency
+): number {
   try {
-    let results = nk.walletLedgerList(userId);
-
-    switch (currencyKeyName) {
-      case Currency.Coins:
-        amountToReturn = results.items[0].changeset[Currency.Coins]
-        break;
-      case Currency.Gems:
-        amountToReturn = results.items[0].changeset[Currency.Gems]
-        break;
-      case Currency.Trophies:
-        amountToReturn = results.items[0].changeset[Currency.Trophies]
-        break;
-    }
-
-    return amountToReturn;
-
+    const account = nk.accountGetId(userId);
+    const wallet = account.wallet;
+    return wallet[currencyKeyName] ?? 0;
   } catch (error) {
-    // Handle error
+    return 0;
   }
-
-  return amountToReturn;
 }

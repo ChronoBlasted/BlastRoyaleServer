@@ -10,7 +10,7 @@ function rpcFindOrCreatePvPBattle(
 ): string {
     const limit = 10;
     const isAuthoritative = true;
-    const label = "PvPBattle"; 
+    const label = "PvPBattle";
     const minSize = 1;
     const maxSize = 2;
 
@@ -114,37 +114,49 @@ const PvPmatchJoin = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 };
 
 
-const PvPmatchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvPBattleData, presences: nkruntime.Presence[]): { state: PvPBattleData } | null {
-    for (let presence of presences) {
-        logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
+const PvPmatchLeave = function (
+    ctx: nkruntime.Context,
+    logger: nkruntime.Logger,
+    nk: nkruntime.Nakama,
+    dispatcher: nkruntime.MatchDispatcher,
+    tick: number,
+    state: PvPBattleData,
+    presences: nkruntime.Presence[]
+): { state: PvPBattleData } | null {
 
-        if (state.player1Id == presence.userId) {
-            PvPPlayerLeave(false, nk, state, logger);
-            dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true)); // faire un autre OpCodes
+    if (ConnectedPlayers(state) > 1) {
+        for (let presence of presences) {
+            logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
+
+            const isP1 = presence.userId === state.player1Id;
+            const opponentId = isP1 ? state.player2Id : state.player1Id;
+            const opponentPresence = state.presences[opponentId];
+
+            PvPPlayerLeave(!isP1, nk, state, logger);
+
+            if (opponentPresence) {
+                dispatcher.broadcastMessage(OpCodes.OPPONENT_LEAVE, JSON.stringify(true), [opponentPresence]);
+            }
+
+            state.presences[presence.userId] = null;
         }
 
-        if (state.player2Id == presence.userId) {
-            PvPPlayerLeave(true, nk, state, logger);
-            dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true)); // faire un autre OpCodes
+        for (let userID in state.presences) {
+            if (state.presences[userID] === null) {
+                delete state.presences[userID];
+            }
         }
 
-        state.presences[presence.userId] = null;
-    }
-
-    for (let userID in state.presences) {
-        if (state.presences[userID] === null) {
-            delete state.presences[userID];
-        }
-    }
-
-    if (ConnectedPlayers(state) === 0) {
+    } else {
+        logger.info("Last player left, match will be closed.");
         return null;
     }
 
-    return {
-        state
-    };
-}
+    logger.info("Player connected amount : %s", ConnectedPlayers(state));
+    return { state };
+};
+
+
 
 const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher, tick: number, state: PvPBattleData, messages: nkruntime.MatchMessage[]): { state: PvPBattleData } | null {
 
@@ -169,14 +181,14 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             const p1Account = nk.accountGetId(state.player1Id);
             const p2Account = nk.accountGetId(state.player2Id);
-            const p1Stat = p1Account.user.metadata.playerStat as PlayerStat;
-            const p2Stat = p2Account.user.metadata.playerStat as PlayerStat;
+            const p1Stat = p1Account.user.metadata.playerStats as PlayerStat;
+            const p2Stat = p2Account.user.metadata.playerStats as PlayerStat;
 
 
             const startDataP1: StartStateData = {
                 newBlastSquad: state.p2Blasts,
                 opponentName: p2Account.user.username,
-                opponentTrophy: getCurrencyInWallet(nk, state.player1Id, Currency.Trophies),
+                opponentTrophy: getCurrencyInWallet(nk, state.player2Id, Currency.Trophies),
                 opponentStats: p2Stat,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
@@ -185,7 +197,7 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             const startDataP2: StartStateData = {
                 newBlastSquad: state.p1Blasts,
                 opponentName: p1Account.user.username,
-                opponentTrophy: getCurrencyInWallet(nk, state.player2Id, Currency.Trophies),
+                opponentTrophy: getCurrencyInWallet(nk, state.player1Id, Currency.Trophies),
                 opponentStats: p1Stat,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
@@ -542,9 +554,8 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player1Id]!]);
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player2Id]!]);
 
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20);
-
+                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
+                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
 
                 return null;
             }
@@ -553,8 +564,8 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player1Id]!]);
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player2Id]!]);
 
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20);
+                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
+                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
 
                 return null;
             }
@@ -609,31 +620,31 @@ function PvPPlayerLeave(p1Win: boolean, nk: nkruntime.Nakama, state: PvPBattleDa
         incrementMetadataStat(nk, state.player1Id, "win", 1);
         incrementMetadataStat(nk, state.player2Id, "loose", 1);
 
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20);
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
 
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000, logger);
     }
     else {
         incrementMetadataStat(nk, state.player2Id, "win", 1);
         incrementMetadataStat(nk, state.player1Id, "loose", 1);
 
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20);
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20);
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
 
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 1000);
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 1000, logger);
     }
 
     let bonusP1Ads = getMetadataStat(nk, state.player1Id, "pvpBattleButtonAds");
     let bonusP2Ads = getMetadataStat(nk, state.player2Id, "pvpBattleButtonAds");
 
     if (bonusP1Ads) {
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000 / 2);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 500, logger);
         setMetadataStat(nk, state.player1Id, "pvpBattleButtonAds", false);
     }
 
     if (bonusP2Ads) {
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 1000 / 2);
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 500, logger);
         setMetadataStat(nk, state.player2Id, "pvpBattleButtonAds", false);
     }
 }

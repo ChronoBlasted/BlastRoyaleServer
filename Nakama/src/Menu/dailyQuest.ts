@@ -27,9 +27,9 @@ type QuestDefinition = {
 
 
 interface DailyQuest {
-    id: string;    
-    goal: number;  
-    progress: number; 
+  id: string;
+  goal: number;
+  progress: number;
 }
 
 interface DailyQuestData {
@@ -171,11 +171,11 @@ function rpcClaimDailyQuestReward(context: nkruntime.Context, logger: nkruntime.
   const reward = rewardList[data.rewardCount];
 
   if (reward.coinsReceived != 0) {
-    updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived);
+    updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived, logger);
   }
 
   if (reward.gemsReceived != 0) {
-    updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived);
+    updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived, logger);
   }
 
   data.rewardCount++;
@@ -199,26 +199,26 @@ function rpcClaimDailyQuestReward(context: nkruntime.Context, logger: nkruntime.
 }
 
 function rpcGetDailyQuestRewards(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    const userId = context.userId;
-    if (!userId) throw new Error("User not authenticated.");
+  const userId = context.userId;
+  if (!userId) throw new Error("User not authenticated.");
 
-    const records = nk.storageRead([{
-        collection: DailyQuestCollectionName,
-        key: DailyQuestStorageKey,
-        userId
-    }]);
+  const records = nk.storageRead([{
+    collection: DailyQuestCollectionName,
+    key: DailyQuestStorageKey,
+    userId
+  }]);
 
-    if (!records.length) throw new Error("No daily quest record found for userId=" + userId);
+  if (!records.length) throw new Error("No daily quest record found for userId=" + userId);
 
-    const data = records[0].value as DailyQuestData;
+  const data = records[0].value as DailyQuestData;
 
-    const response = {
-        rewards: rewardList,
-        rewardCount: data.rewardCount
-    };
+  const response = {
+    rewards: rewardList,
+    rewardCount: data.rewardCount
+  };
 
-    logger.debug(`rpcGetDailyQuestRewards: userId=${userId} rewardCount=${data.rewardCount}`);
-    return JSON.stringify(response);
+  logger.debug(`rpcGetDailyQuestRewards: userId=${userId} rewardCount=${data.rewardCount}`);
+  return JSON.stringify(response);
 }
 
 

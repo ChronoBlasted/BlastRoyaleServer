@@ -319,6 +319,9 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     break;
                 //region Player Use Item
                 case TurnType.Item:
+
+                    logger.debug("selected Blast %f",state.turnStateData.p1TurnData.itemUse?.index_blast)
+                    logger.debug("selected Item %f",state.turnStateData.p1TurnData.itemUse?.index_item)
                     let msgItem = {} as ItemUseJSON;
                     msgItem = state.turnStateData.p1TurnData.itemUse!;
                     msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
@@ -536,14 +539,14 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                             addItem(nk, logger, state.player1Id, currentOffer.item!);
                             break;
                         case OfferType.Coin:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount);
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount,logger);
 
-                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount / 2)
+                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount / 2,logger)
                             break;
                         case OfferType.Gem:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount);
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount,logger);
 
-                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount / 2)
+                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount / 2,logger)
                             break;
                         case OfferType.None:
                             break;
@@ -705,9 +708,9 @@ function PvEPlayerLeave(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkru
     if (state.indexProgression > 1) {
         let totalCoins = 200 * (state.indexProgression - 1);
 
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins,logger);
 
-        if (bonusAds) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins / 2);
+        if (bonusAds) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins / 2,logger);
 
         writeBestRecordLeaderboard(nk, logger, state.player1Id, LeaderboardBestStageAreaId + getMetadataStat(nk, state.player1Id, "area"), state.indexProgression - 1);
     }

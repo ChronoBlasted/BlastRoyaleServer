@@ -77,6 +77,8 @@ const PvEinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         },
 
         turnStateData: {
+            p1TurnPriority: false,
+
             p1TurnData: {
                 type: TurnType.None,
                 index: 0,

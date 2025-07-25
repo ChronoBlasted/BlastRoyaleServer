@@ -57,9 +57,10 @@ interface BattleData {
 }
 
 interface TurnStateData {
+    p1TurnPriority: boolean,
     p1TurnData: PlayerTurnData,
     p2TurnData: PlayerTurnData,
-    catched: boolean;
+    catched?: boolean;
 }
 
 interface PlayerActionData {
@@ -79,7 +80,7 @@ interface StartStateData {
     newBlastSquad: Blast[];
     opponentName: string;
     opponentTrophy?: number;
-    opponentStats? : PlayerStat;
+    opponentStats?: PlayerStat;
     meteo: Meteo;
     turnDelay: number;
 }
@@ -471,10 +472,15 @@ function healStatusBlast(blast: BlastEntity, status: Status): BlastEntity {
 
 // #region round logic
 
-function getFasterBlast(blast1: BlastEntity, blast2: BlastEntity): boolean {
 
-    return blast1.speed > blast2.speed;
+function getFasterBlast(blast1: BlastEntity, blast2: BlastEntity): boolean {
+    if (blast1.speed === blast2.speed) {
+        return Math.random() < 0.5;
+    } else {
+        return blast1.speed > blast2.speed;
+    }
 }
+
 
 function getRandomMeteo(): Meteo {
     const values = Object.values(Meteo).filter(value => typeof value === "number") as Meteo[];
@@ -539,10 +545,14 @@ function performAttackSequence(state: BattleData, dispatcher: nkruntime.MatchDis
     const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
     const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
 
-    const p1First = p1Move.priority > p2Move.priority ||
-        (p1Move.priority === p2Move.priority && getFasterBlast(p1Blast, p2Blast));
+    let p1First = false;
+    if (p1Move.priority === p2Move.priority) {
+        p1First = getFasterBlast(p1Blast, p2Blast)
+    } else {
+        p1First = p1Move.priority > p2Move.priority
+    }
 
-    logger.debug("P1 Move: %s, P2 Move: %s, P1 First: %s", p1Move.id, p2Move.id, p1First);
+    state.turnStateData.p1TurnPriority = p1First;
 
     if (p1First) {
         executePlayerAttack(true, state, logger, dispatcher);

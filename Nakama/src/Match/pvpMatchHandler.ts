@@ -1,6 +1,6 @@
 interface PvPBattleData extends BattleData {
-    turnDelay: number, // Délai entre les tours en 1 000ms pour 1 seconde
-    turnTimer: number | null, // Timer pour le tour actuel
+    turnDelay: number,
+    turnTimer: number | null,
 }
 
 function rpcFindOrCreatePvPBattle(
@@ -10,7 +10,7 @@ function rpcFindOrCreatePvPBattle(
 ): string {
     const limit = 10;
     const isAuthoritative = true;
-    const label = "PvPBattle"; // ← Doit correspondre au label défini dans matchInit
+    const label = "PvPBattle"; 
     const minSize = 1;
     const maxSize = 2;
 
@@ -56,6 +56,7 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         turnTimer: null,
 
         turnStateData: {
+            p1TurnPriority: false,
             p1TurnData: {
                 type: TurnType.None,
                 index: 0,
@@ -69,8 +70,6 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 moveDamage: 0,
                 moveEffects: [],
             },
-
-            catched: false
         }
     };
 
@@ -595,10 +594,10 @@ const PvPmatchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Lo
 function SendTurnState(dispatcher: nkruntime.MatchDispatcher, state: PvPBattleData, OpCodes: OpCodes) {
     dispatcher.broadcastMessage(OpCodes, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]!]);
 
-    const reversedTurnStateData = {
+    const reversedTurnStateData: TurnStateData = {
+        p1TurnPriority: !state.turnStateData.p1TurnPriority,
         p1TurnData: state.turnStateData.p2TurnData,
         p2TurnData: state.turnStateData.p1TurnData,
-        catched: state.turnStateData.catched
     };
 
     dispatcher.broadcastMessage(OpCodes, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]!]);

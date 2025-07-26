@@ -4,16 +4,16 @@ const PermissionRead = 2;
 const PermissionWrite = 0;
 
 interface BlastTrackerData {
-    [monsterId: string]: BlastTrackerEntry;
+  [monsterId: string]: BlastTrackerEntry;
 }
 
 interface BlastTrackerEntry {
-    versions: { [version: string]: BlastVersionData };
+  versions: { [version: string]: BlastVersionData };
 }
 
 interface BlastVersionData {
-    catched: boolean;
-    rewardClaimed: boolean;
+  catched: boolean;
+  rewardClaimed: boolean;
 }
 
 
@@ -24,11 +24,13 @@ function initializeBlastTrackerData(userId: string, nk: nkruntime.Nakama, logger
     const initialData: BlastTrackerData = {};
 
     for (const blast of blastPedia) {
-      initialData[blast.id] = { versions: {
-        1: { catched: false, rewardClaimed: false },
-        2: { catched: false, rewardClaimed: false },
-        3: { catched: false, rewardClaimed: false }
-      }};
+      initialData[blast.id] = {
+        versions: {
+          1: { catched: false, rewardClaimed: false },
+          2: { catched: false, rewardClaimed: false },
+          3: { catched: false, rewardClaimed: false }
+        }
+      };
     }
 
     try {
@@ -87,105 +89,96 @@ function markMonsterCaptured(userId: string, monsterId: string, version: number,
 }
 
 function rpcGetAllBlastTrackerData(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    const userId = context.userId;
-    if (!userId) {
-        throw new Error("User not authenticated");
-    }
+  const userId = context.userId;
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
 
-    const records = nk.storageRead([{ collection: BlastTrackerCollection, key: BlastTrackerKey, userId }]);
-    if (records.length === 0) {
-        throw new Error("No monster capture data found");
-    }
+  const records = nk.storageRead([{ collection: BlastTrackerCollection, key: BlastTrackerKey, userId }]);
+  if (records.length === 0) {
+    throw new Error("No monster capture data found");
+  }
 
-    return JSON.stringify(records[0].value as BlastTrackerData);
+  return JSON.stringify(records[0].value as BlastTrackerData);
 }
 
 
 function rpcClaimFirstCaptureReward(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
-    const userId = context.userId;
-    if (!userId) {
-        throw new Error("User not authenticated");
-    }
+  const userId = context.userId;
+  if (!userId) {
+    throw new Error("User not authenticated");
+  }
 
-    const dataInput = JSON.parse(payload) as { monsterId: string, version: number };
+  const dataInput = JSON.parse(payload) as { monsterId: string, version: number };
 
-    if (!dataInput.monsterId || dataInput.version === undefined) {
-        throw new Error("Invalid input");
-    }
+  if (!dataInput.monsterId || dataInput.version === undefined) {
+    throw new Error("Invalid input");
+  }
 
-    const records = nk.storageRead([{ collection: BlastTrackerCollection, key: BlastTrackerKey, userId }]);
-    if (records.length === 0) {
-        throw new Error("No monster capture data found");
-    }
+  const records = nk.storageRead([{ collection: BlastTrackerCollection, key: BlastTrackerKey, userId }]);
+  if (records.length === 0) {
+    throw new Error("No monster capture data found");
+  }
 
-    const playerData = records[0].value;
+  const playerData = records[0].value;
 
-    if (!playerData[dataInput.monsterId] || !playerData[dataInput.monsterId].versions) {
-        throw new Error("Monster data not found");
-    }
+  if (!playerData[dataInput.monsterId] || !playerData[dataInput.monsterId].versions) {
+    throw new Error("Monster data not found");
+  }
 
-    const monsterVersions = playerData[dataInput.monsterId].versions as { [version: string]: BlastVersionData };
+  const monsterVersions = playerData[dataInput.monsterId].versions as { [version: string]: BlastVersionData };
 
-    if (!monsterVersions[dataInput.version] || !monsterVersions[dataInput.version].catched) {
-        throw new Error("Monster/version not captured");
-    }
+  if (!monsterVersions[dataInput.version] || !monsterVersions[dataInput.version].catched) {
+    throw new Error("Monster/version not captured");
+  }
 
-    if (monsterVersions[dataInput.version].rewardClaimed) {
-        throw new Error("Reward already claimed for this monster/version");
-    }
+  if (monsterVersions[dataInput.version].rewardClaimed) {
+    throw new Error("Reward already claimed for this monster/version");
+  }
 
-    monsterVersions[dataInput.version].rewardClaimed = true;
+  monsterVersions[dataInput.version].rewardClaimed = true;
 
-    try {
-        nk.storageWrite([{
-            collection: BlastTrackerCollection,
-            key: BlastTrackerKey,
-            userId: userId,
-            value: playerData,
-            version: records[0].version,
-            permissionRead: PermissionRead,
-            permissionWrite: PermissionWrite,
-        }]);
-    } catch (e) {
-        logger.error("storageWrite error: %q", e);
-        throw e;
-    }
+  try {
+    nk.storageWrite([{
+      collection: BlastTrackerCollection,
+      key: BlastTrackerKey,
+      userId: userId,
+      value: playerData,
+      version: records[0].version,
+      permissionRead: PermissionRead,
+      permissionWrite: PermissionWrite,
+    }]);
+  } catch (e) {
+    logger.error("storageWrite error: %q", e);
+    throw e;
+  }
 
-    const reward = getRewardForMonsterVersion(dataInput.version);
+  const reward = getRewardForMonsterVersion(dataInput.version);
 
-    return JSON.stringify({ success: true, reward });
+  return JSON.stringify({ success: true, reward });
 }
 
 function getRewardForMonsterVersion(version: number): Reward {
 
-    switch (version) {
-        case 1:
-            return {
-                coinsReceived: 200,
-                gemsReceived: 0,
-                blastReceived: null,
-                itemReceived: null,
-            };
-        case 2:
-            return {
-                coinsReceived: 1000,
-                gemsReceived: 0,
-                blastReceived: null,
-                itemReceived: null,
-            };
-        case 3:
-            return {
-                coinsReceived: 0,
-                gemsReceived: 10,
-                blastReceived: null,
-                itemReceived: null,
-            };
-        default:
-            return {
-                coinsReceived: 0,
-                gemsReceived: 0,
-                blastReceived: null,
-                itemReceived: null,
-            };
-    }
+  switch (version) {
+    case 1:
+      return {
+        type: RewardType.Coin,
+        amount: 200,
+      };
+    case 2:
+      return {
+        type: RewardType.Coin,
+        amount: 1000,
+      };
+    case 3:
+      return {
+        type: RewardType.Gem,
+        amount: 10,
+      };
+    default:
+      return {
+        type: RewardType.None,
+      };
+  }
 }

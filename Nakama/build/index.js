@@ -181,10 +181,12 @@ const DefaultMetadata = {
     battle_pass: false,
     updated_nickname: false,
     area: 0,
-    win: 0,
-    loose: 0,
-    blast_catched: 0,
-    blast_defeated: 0,
+    playerStats: {
+        win: 0,
+        loose: 0,
+        blast_catched: 0,
+        blast_defeated: 0
+    },
     pveBattleButtonAds: false,
     pvpBattleButtonAds: false,
 };
@@ -271,8 +273,8 @@ function rpcUpdateNicknameStatus(ctx, logger, nk) {
 function incrementMetadataStat(nk, userId, statKey, increment) {
     const account = nk.accountGetId(userId);
     const metadata = account.user.metadata;
-    metadata[statKey] = metadata[statKey] + increment;
-    nk.accountUpdateId(userId, "", null, null, null, null, null, metadata);
+    metadata.playerStats[statKey] = metadata.playerStats[statKey] + increment;
+    nk.accountUpdateId(userId, null, null, null, null, null, null, metadata);
 }
 function setMetadataStat(nk, userId, statKey, value) {
     const account = nk.accountGetId(userId);
@@ -520,34 +522,30 @@ function storeUserWallet(nk, user_id, changeset, logger) {
         logger.error('Error storing wallet of player : %s', user_id);
     }
 }
-function updateWalletWithCurrency(nk, userId, currencyKeyName, amount) {
-    const changeset = {
-        [currencyKeyName]: amount,
-    };
-    let result = nk.walletUpdate(userId, changeset);
-    return result;
+function updateWalletWithCurrency(nk, userId, currencyKeyName, amount, logger) {
+    var _a;
+    amount = Math.trunc(amount);
+    const currentAmount = (_a = getCurrencyInWallet(nk, userId, currencyKeyName)) !== null && _a !== void 0 ? _a : 0;
+    if (amount < 0) {
+        const maxRemovable = Math.min(currentAmount, -amount);
+        amount = -maxRemovable;
+    }
+    if (amount === 0) {
+        logger.debug("Wallet update skipped: amount is 0 for user %s and currency %s", userId, currencyKeyName);
+        return null;
+    }
+    return nk.walletUpdate(userId, { [currencyKeyName]: amount });
 }
 function getCurrencyInWallet(nk, userId, currencyKeyName) {
-    var amountToReturn = 0;
+    var _a;
     try {
-        let results = nk.walletLedgerList(userId);
-        switch (currencyKeyName) {
-            case Currency.Coins:
-                amountToReturn = results.items[0].changeset[Currency.Coins];
-                break;
-            case Currency.Gems:
-                amountToReturn = results.items[0].changeset[Currency.Gems];
-                break;
-            case Currency.Trophies:
-                amountToReturn = results.items[0].changeset[Currency.Trophies];
-                break;
-        }
-        return amountToReturn;
+        const account = nk.accountGetId(userId);
+        const wallet = account.wallet;
+        return (_a = wallet[currencyKeyName]) !== null && _a !== void 0 ? _a : 0;
     }
     catch (error) {
-        // Handle error
+        return 0;
     }
-    return amountToReturn;
 }
 var AttackType;
 (function (AttackType) {
@@ -659,10 +657,10 @@ const Slash = {
 const Cut = {
     id: 8,
     type: Type.Normal,
-    attackType: AttackType.Normal,
+    attackType: AttackType.Special,
     target: Target.Opponent,
     power: 80,
-    cost: 13,
+    cost: 1,
     priority: 0,
     effects: [],
 };
@@ -1397,11 +1395,11 @@ const Lizzy = {
     type: Type.Grass,
     hp: 70, mana: 80, attack: 75, defense: 70, speed: 65,
     movepool: [
-        { move_id: Claw.id, levelMin: 0 },
-        { move_id: Leafs.id, levelMin: 2 },
-        { move_id: Growth.id, levelMin: 4 },
+        { move_id: Leafs.id, levelMin: 0 },
+        { move_id: Growth.id, levelMin: 2 },
+        { move_id: VineWhip.id, levelMin: 4 },
+        { move_id: Claw.id, levelMin: 8 },
         { move_id: RazorLeaf.id, levelMin: 6 },
-        { move_id: VineWhip.id, levelMin: 8 },
         { move_id: Roots.id, levelMin: 10 },
         { move_id: GrassKnot.id, levelMin: 12 },
         { move_id: FlowerStorm.id, levelMin: 16 },
@@ -1419,8 +1417,8 @@ const Punchball = {
     movepool: [
         { move_id: Ember.id, levelMin: 0 },
         { move_id: OverHeat.id, levelMin: 2 },
-        { move_id: FirePunch.id, levelMin: 4 },
-        { move_id: Flamethrower.id, levelMin: 8 },
+        { move_id: Flamethrower.id, levelMin: 4 },
+        { move_id: FirePunch.id, levelMin: 8 },
         { move_id: FireBlast.id, levelMin: 12 },
         { move_id: FireWheel.id, levelMin: 16 },
         { move_id: Nitro.id, levelMin: 20 },
@@ -1437,8 +1435,8 @@ const Jellys = {
     movepool: [
         { move_id: AquaJet.id, levelMin: 0 },
         { move_id: AquaBoost.id, levelMin: 2 },
-        { move_id: HydroTail.id, levelMin: 4 },
-        { move_id: Waterfall.id, levelMin: 8 },
+        { move_id: Waterfall.id, levelMin: 4 },
+        { move_id: HydroTail.id, levelMin: 7 },
         { move_id: Aquagym.id, levelMin: 10 },
         { move_id: HydroBlast.id, levelMin: 12 },
         { move_id: Bubble.id, levelMin: 16 },
@@ -1454,13 +1452,13 @@ const Kitchi = {
     hp: 55, mana: 70, attack: 75, defense: 65, speed: 80,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
-        { move_id: QuickAttack.id, levelMin: 2 },
-        { move_id: Growl.id, levelMin: 4 },
+        { move_id: Growl.id, levelMin: 2 },
+        { move_id: Cut.id, levelMin: 4 },
         { move_id: Harden.id, levelMin: 6 },
+        { move_id: QuickAttack.id, levelMin: 7 },
         { move_id: ClawCombo.id, levelMin: 8 },
         { move_id: Cleanse.id, levelMin: 10 },
         { move_id: Slash.id, levelMin: 14 },
-        { move_id: Cut.id, levelMin: 16 },
     ],
     nextEvolution: { id: 5, levelRequired: 7 }, catchRate: 30, expYield: 64, rarity: Rarity.Common,
 };
@@ -1470,13 +1468,13 @@ const Kenchi = {
     hp: 50, mana: 70, attack: 80, defense: 70, speed: 65,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
-        { move_id: QuickAttack.id, levelMin: 2 },
-        { move_id: Growl.id, levelMin: 4 },
+        { move_id: Growl.id, levelMin: 2 },
+        { move_id: Cut.id, levelMin: 4 },
         { move_id: Harden.id, levelMin: 6 },
-        { move_id: Cleanse.id, levelMin: 8 },
-        { move_id: ClawCombo.id, levelMin: 12 },
+        { move_id: QuickAttack.id, levelMin: 7 },
+        { move_id: ClawCombo.id, levelMin: 8 },
+        { move_id: Cleanse.id, levelMin: 10 },
         { move_id: Slash.id, levelMin: 14 },
-        { move_id: Cut.id, levelMin: 16 },
     ],
     nextEvolution: null, catchRate: 35, expYield: 96, rarity: Rarity.Uncommon,
 };
@@ -1486,13 +1484,13 @@ const Mousy = {
     hp: 50, mana: 75, attack: 75, defense: 70, speed: 80,
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
-        { move_id: QuickAttack.id, levelMin: 2 },
-        { move_id: Growl.id, levelMin: 4 },
+        { move_id: Growl.id, levelMin: 2 },
+        { move_id: Cut.id, levelMin: 4 },
         { move_id: Harden.id, levelMin: 6 },
         { move_id: Cleanse.id, levelMin: 8 },
         { move_id: ClawCombo.id, levelMin: 12 },
         { move_id: Slash.id, levelMin: 14 },
-        { move_id: Cut.id, levelMin: 16 },
+        { move_id: QuickAttack.id, levelMin: 16 },
     ],
     nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.Common,
 };
@@ -1503,12 +1501,12 @@ const Clawball = {
     movepool: [
         { move_id: Claw.id, levelMin: 0 },
         { move_id: QuickAttack.id, levelMin: 2 },
-        { move_id: Growl.id, levelMin: 4 },
+        { move_id: Cut.id, levelMin: 4 },
         { move_id: Harden.id, levelMin: 6 },
         { move_id: Cleanse.id, levelMin: 8 },
         { move_id: ClawCombo.id, levelMin: 12 },
         { move_id: Slash.id, levelMin: 14 },
-        { move_id: Cut.id, levelMin: 16 },
+        { move_id: Growl.id, levelMin: 16 },
         { move_id: Stomp.id, levelMin: 20 },
         { move_id: Slam.id, levelMin: 22 },
         { move_id: Harden.id, levelMin: 26 },
@@ -2724,14 +2722,15 @@ function defaultBlastCollection(nk, logger, userId) {
         storedBlasts: [],
     };
 }
-var OfferType;
-(function (OfferType) {
-    OfferType[OfferType["None"] = 0] = "None";
-    OfferType[OfferType["Coin"] = 1] = "Coin";
-    OfferType[OfferType["Gem"] = 2] = "Gem";
-    OfferType[OfferType["Blast"] = 3] = "Blast";
-    OfferType[OfferType["Item"] = 4] = "Item";
-})(OfferType || (OfferType = {}));
+var RewardType;
+(function (RewardType) {
+    RewardType[RewardType["None"] = 0] = "None";
+    RewardType[RewardType["Coin"] = 1] = "Coin";
+    RewardType[RewardType["Gem"] = 2] = "Gem";
+    RewardType[RewardType["Trophy"] = 3] = "Trophy";
+    RewardType[RewardType["Blast"] = 4] = "Blast";
+    RewardType[RewardType["Item"] = 5] = "Item";
+})(RewardType || (RewardType = {}));
 //#region BlastTrap Offer
 const blastTrap = {
     data_id: blastTrapData.id,
@@ -2740,10 +2739,7 @@ const blastTrap = {
 const blastTrapOffer = {
     offer_id: 1,
     offer: {
-        type: OfferType.Item,
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
+        type: RewardType.Item,
         item: blastTrap,
     },
     currency: Currency.Coins,
@@ -2757,10 +2753,7 @@ const superBlastTrap = {
 const superBlastTrapOffer = {
     offer_id: 2,
     offer: {
-        type: OfferType.Item,
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
+        type: RewardType.Item,
         item: superBlastTrap,
     },
     currency: Currency.Coins,
@@ -2774,10 +2767,7 @@ const hyperBlastTrap = {
 const hyperBlastTrapOffer = {
     offer_id: 3,
     offer: {
-        type: OfferType.Item,
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
+        type: RewardType.Item,
         item: hyperBlastTrap,
     },
     currency: Currency.Coins,
@@ -2810,11 +2800,8 @@ const rpcBuyTrapOffer = function (ctx, logger, nk, payload) {
 const coinsOffer1 = {
     offer_id: 4,
     offer: {
-        type: OfferType.Coin,
-        coinsAmount: 20000,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+        type: RewardType.Coin,
+        amount: 20000,
     },
     currency: Currency.Gems,
     price: 100,
@@ -2823,11 +2810,8 @@ const coinsOffer1 = {
 const coinsOffer2 = {
     offer_id: 5,
     offer: {
-        type: OfferType.Coin,
-        coinsAmount: 65000,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+        type: RewardType.Coin,
+        amount: 65000,
     },
     currency: Currency.Gems,
     price: 300,
@@ -2836,11 +2820,8 @@ const coinsOffer2 = {
 const coinsOffer3 = {
     offer_id: 6,
     offer: {
-        type: OfferType.Coin,
-        coinsAmount: 140000,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+        type: RewardType.Coin,
+        amount: 140000,
     },
     currency: Currency.Gems,
     price: 600,
@@ -2859,7 +2840,7 @@ const rpcBuyCoinOffer = function (ctx, logger, nk, payload) {
     var storeOffer = coinsOffer[indexOffer];
     try {
         nk.walletUpdate(ctx.userId, { [storeOffer.currency]: -storeOffer.price });
-        nk.walletUpdate(ctx.userId, { [Currency.Coins]: storeOffer.offer.coinsAmount });
+        nk.walletUpdate(ctx.userId, { [Currency.Coins]: storeOffer.offer.amount });
     }
     catch (error) {
         logger.error('error buying blast trap: %s', error);
@@ -2871,11 +2852,8 @@ const rpcBuyCoinOffer = function (ctx, logger, nk, payload) {
 const gemsOffer1 = {
     offer_id: 7,
     offer: {
-        type: OfferType.Gem,
-        coinsAmount: 0,
-        gemsAmount: 160,
-        blast: null,
-        item: null,
+        type: RewardType.Gem,
+        amount: 160,
     },
     currency: Currency.Hard,
     price: 0,
@@ -2884,11 +2862,8 @@ const gemsOffer1 = {
 const gemsOffer2 = {
     offer_id: 8,
     offer: {
-        type: OfferType.Gem,
-        coinsAmount: 0,
-        gemsAmount: 500,
-        blast: null,
-        item: null,
+        type: RewardType.Gem,
+        amount: 500,
     },
     currency: Currency.Hard,
     price: 0,
@@ -2897,11 +2872,8 @@ const gemsOffer2 = {
 const gemsOffer3 = {
     offer_id: 9,
     offer: {
-        type: OfferType.Gem,
-        coinsAmount: 0,
-        gemsAmount: 1200,
-        blast: null,
-        item: null,
+        type: RewardType.Gem,
+        amount: 1200,
     },
     currency: Currency.Hard,
     price: 0,
@@ -2910,11 +2882,8 @@ const gemsOffer3 = {
 const gemsOffer4 = {
     offer_id: 10,
     offer: {
-        type: OfferType.Gem,
-        coinsAmount: 0,
-        gemsAmount: 2500,
-        blast: null,
-        item: null,
+        type: RewardType.Gem,
+        amount: 2500,
     },
     currency: Currency.Hard,
     price: 0,
@@ -2923,11 +2892,8 @@ const gemsOffer4 = {
 const gemsOffer5 = {
     offer_id: 11,
     offer: {
-        type: OfferType.Gem,
-        coinsAmount: 0,
-        gemsAmount: 6500,
-        blast: null,
-        item: null,
+        type: RewardType.Gem,
+        amount: 6500,
     },
     currency: Currency.Hard,
     price: 0,
@@ -2936,11 +2902,8 @@ const gemsOffer5 = {
 const gemsOffer6 = {
     offer_id: 12,
     offer: {
-        type: OfferType.Gem,
-        coinsAmount: 0,
-        gemsAmount: 14000,
-        blast: null,
-        item: null,
+        type: RewardType.Gem,
+        amount: 14000,
     },
     currency: Currency.Hard,
     price: 0,
@@ -2963,7 +2926,7 @@ const rpcBuyGemOffer = function (ctx, logger, nk, payload) {
     try {
         // Verif
         // Achat in app
-        nk.walletUpdate(ctx.userId, { [Currency.Gems]: storeOffer.offer.gemsAmount });
+        nk.walletUpdate(ctx.userId, { [Currency.Gems]: storeOffer.offer.amount });
     }
     catch (error) {
         logger.error('error buying blast trap: %s', error);
@@ -3103,7 +3066,7 @@ function generateRandomDailyShop(nk, userId, logger) {
     return dailyShop;
 }
 function getRandomOfferType() {
-    const offerTypeValues = Object.values(OfferType);
+    const offerTypeValues = Object.values(RewardType);
     const randomIndex = Math.floor(Math.random() * offerTypeValues.length);
     return offerTypeValues[randomIndex];
 }
@@ -3111,24 +3074,20 @@ function getRandomStoreOffer(nk, userId, logger) {
     let storeOffer = {
         offer_id: -1,
         offer: {
-            type: OfferType.None,
-            coinsAmount: 0,
-            gemsAmount: 0,
-            blast: null,
-            item: null,
+            type: RewardType.None,
         },
         price: 0,
         currency: Currency.Coins,
         isAlreadyBuyed: false,
     };
     if (Math.random() < 0.5) {
-        storeOffer.offer.type = OfferType.Blast;
+        storeOffer.offer.type = RewardType.Blast;
         storeOffer.offer.blast = getRandomBlastEntityInAllPlayerArea(userId, nk, false);
         storeOffer.price = getBlastPrice(storeOffer.offer.blast);
         storeOffer.currency = Currency.Coins;
     }
     else {
-        storeOffer.offer.type = OfferType.Item;
+        storeOffer.offer.type = RewardType.Item;
         storeOffer.offer.item = getRandomItem(1 + Math.floor(Math.random() * 10));
         storeOffer.price = getItemPrice(storeOffer.offer.item) * storeOffer.offer.item.amount;
         storeOffer.currency = Currency.Coins;
@@ -3312,11 +3271,11 @@ function rpcClaimDailyQuestReward(context, logger, nk, payload) {
         throw new Error("No rewards to claim");
     }
     const reward = rewardList[data.rewardCount];
-    if (reward.coinsReceived != 0) {
-        updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived);
+    if (reward.type == RewardType.Coin) {
+        updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.amount, logger);
     }
-    if (reward.gemsReceived != 0) {
-        updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived);
+    if (reward.type == RewardType.Gem) {
+        updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.amount, logger);
     }
     data.rewardCount++;
     try {
@@ -3356,10 +3315,10 @@ function rpcGetDailyQuestRewards(context, logger, nk, payload) {
     return JSON.stringify(response);
 }
 const rewardList = [
-    { coinsReceived: 0, gemsReceived: 2, blastReceived: null, itemReceived: null },
-    { coinsReceived: 2000, gemsReceived: 0, blastReceived: null, itemReceived: null },
-    { coinsReceived: 10000, gemsReceived: 0, blastReceived: null, itemReceived: null },
-    { coinsReceived: 0, gemsReceived: 10, blastReceived: null, itemReceived: null },
+    { type: RewardType.Gem, amount: 2 },
+    { type: RewardType.Coin, amount: 2000 },
+    { type: RewardType.Coin, amount: 5000 },
+    { type: RewardType.Gem, amount: 5 },
 ];
 const DailyRewardPermissionRead = 2;
 const DailyRewardPermissionWrite = 0;
@@ -3414,10 +3373,7 @@ function rpcCanClaimDailyReward(context, logger, nk, payload) {
 }
 function rpcClaimDailyReward(context, logger, nk, payload) {
     var reward = {
-        coinsReceived: 0,
-        gemsReceived: 0,
-        blastReceived: null,
-        itemReceived: null,
+        type: RewardType.None
     };
     var dailyReward = getLastDailyRewardObject(context, logger, nk, payload);
     if (isDailyResetDue(dailyReward.lastClaimUnix)) {
@@ -3430,8 +3386,8 @@ function rpcClaimDailyReward(context, logger, nk, payload) {
             subject: "You've received a new item",
             userId: context.userId,
         };
-        if (reward.coinsReceived != 0) {
-            updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived);
+        if (reward.type == RewardType.Coin) {
+            updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.amount, logger);
             notification = {
                 code: notificationOpCodes.CURENCY,
                 content: reward,
@@ -3447,8 +3403,8 @@ function rpcClaimDailyReward(context, logger, nk, payload) {
                 throw error;
             }
         }
-        if (reward.gemsReceived != 0) {
-            updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived);
+        if (reward.type == RewardType.Gem) {
+            updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.amount, logger);
             notification = {
                 code: notificationOpCodes.CURENCY,
                 content: reward,
@@ -3464,11 +3420,11 @@ function rpcClaimDailyReward(context, logger, nk, payload) {
                 throw error;
             }
         }
-        if (reward.blastReceived != null) {
-            addBlast(nk, logger, context.userId, reward.blastReceived);
+        if (reward.type == RewardType.Blast) {
+            addBlast(nk, logger, context.userId, reward.blast);
         }
-        if (reward.itemReceived != null) {
-            addItem(nk, logger, context.userId, reward.itemReceived);
+        if (reward.type == RewardType.Item) {
+            addItem(nk, logger, context.userId, reward.item);
         }
         dailyReward.lastClaimUnix = msecToSec(Date.now());
         dailyReward.totalDay = totalDay + 1;
@@ -3501,14 +3457,14 @@ function getDayReward(totalDay) {
 }
 // Data
 const allReward = [
-    { coinsReceived: 0, gemsReceived: 5, blastReceived: null, itemReceived: null },
-    { coinsReceived: 750, gemsReceived: 0, blastReceived: null, itemReceived: null },
-    { coinsReceived: 0, gemsReceived: 15, blastReceived: null, itemReceived: null },
-    { coinsReceived: 2000, gemsReceived: 0, blastReceived: null, itemReceived: null },
-    { coinsReceived: 0, gemsReceived: 30, blastReceived: null, itemReceived: null },
-    { coinsReceived: 5000, gemsReceived: 0, blastReceived: null, itemReceived: null },
+    { type: RewardType.Gem, amount: 5 },
+    { type: RewardType.Coin, amount: 750 },
+    { type: RewardType.Gem, amount: 15 },
+    { type: RewardType.Coin, amount: 2000 },
+    { type: RewardType.Gem, amount: 30 },
+    { type: RewardType.Coin, amount: 5000 },
     {
-        coinsReceived: 0, gemsReceived: 0, blastReceived: {
+        type: RewardType.Blast, blast: {
             uuid: generateUUID(),
             data_id: Clawball.id,
             exp: calculateExperienceFromLevel(10),
@@ -3516,7 +3472,7 @@ const allReward = [
             boss: false,
             shiny: true,
             activeMoveset: getRandomActiveMoveset(Clawball, calculateExperienceFromLevel(10))
-        }, itemReceived: null
+        }
     },
 ];
 const rpcLoadAllDailyReward = function () {
@@ -3591,11 +3547,13 @@ function initializeBlastTrackerData(userId, nk, logger) {
     if (records.length === 0) {
         const initialData = {};
         for (const blast of blastPedia) {
-            initialData[blast.id] = { versions: {
+            initialData[blast.id] = {
+                versions: {
                     1: { catched: false, rewardClaimed: false },
                     2: { catched: false, rewardClaimed: false },
                     3: { catched: false, rewardClaimed: false }
-                } };
+                }
+            };
         }
         try {
             nk.storageWrite([{
@@ -3705,31 +3663,22 @@ function getRewardForMonsterVersion(version) {
     switch (version) {
         case 1:
             return {
-                coinsReceived: 200,
-                gemsReceived: 0,
-                blastReceived: null,
-                itemReceived: null,
+                type: RewardType.Coin,
+                amount: 200,
             };
         case 2:
             return {
-                coinsReceived: 1000,
-                gemsReceived: 0,
-                blastReceived: null,
-                itemReceived: null,
+                type: RewardType.Coin,
+                amount: 1000,
             };
         case 3:
             return {
-                coinsReceived: 0,
-                gemsReceived: 10,
-                blastReceived: null,
-                itemReceived: null,
+                type: RewardType.Gem,
+                amount: 10,
             };
         default:
             return {
-                coinsReceived: 0,
-                gemsReceived: 0,
-                blastReceived: null,
-                itemReceived: null,
+                type: RewardType.None,
             };
     }
 }
@@ -3745,10 +3694,12 @@ var OpCodes;
     OpCodes[OpCodes["ENEMY_READY"] = 55] = "ENEMY_READY";
     OpCodes[OpCodes["NEW_BATTLE_TURN"] = 60] = "NEW_BATTLE_TURN";
     OpCodes[OpCodes["PLAYER_MUST_CHANGE_BLAST"] = 61] = "PLAYER_MUST_CHANGE_BLAST";
+    OpCodes[OpCodes["PLAYER_READY_MUST_CHANGE"] = 62] = "PLAYER_READY_MUST_CHANGE";
     OpCodes[OpCodes["NEW_OFFER_TURN"] = 80] = "NEW_OFFER_TURN";
     OpCodes[OpCodes["PLAYER_CHOOSE_OFFER"] = 81] = "PLAYER_CHOOSE_OFFER";
     OpCodes[OpCodes["NEW_BLAST"] = 90] = "NEW_BLAST";
     OpCodes[OpCodes["MATCH_END"] = 100] = "MATCH_END";
+    OpCodes[OpCodes["OPPONENT_LEAVE"] = 101] = "OPPONENT_LEAVE";
     OpCodes[OpCodes["ERROR_SERV"] = 404] = "ERROR_SERV";
     OpCodes[OpCodes["DEBUG"] = 500] = "DEBUG";
 })(OpCodes || (OpCodes = {}));
@@ -3761,9 +3712,11 @@ var BattleState;
     BattleState[BattleState["Waiting"] = 2] = "Waiting";
     BattleState[BattleState["Ready"] = 3] = "Ready";
     BattleState[BattleState["ResolveTurn"] = 4] = "ResolveTurn";
-    BattleState[BattleState["WaitForPlayerSwap"] = 5] = "WaitForPlayerSwap";
-    BattleState[BattleState["WaitForPlayerChooseOffer"] = 6] = "WaitForPlayerChooseOffer";
-    BattleState[BattleState["End"] = 7] = "End";
+    BattleState[BattleState["WaitingForPlayerSwap"] = 5] = "WaitingForPlayerSwap";
+    BattleState[BattleState["ReadyForPlayerSwap"] = 6] = "ReadyForPlayerSwap";
+    BattleState[BattleState["ResolvePlayerSwap"] = 7] = "ResolvePlayerSwap";
+    BattleState[BattleState["WaitForPlayerChooseOffer"] = 8] = "WaitForPlayerChooseOffer";
+    BattleState[BattleState["End"] = 9] = "End";
 })(BattleState || (BattleState = {}));
 var PlayerState;
 (function (PlayerState) {
@@ -3771,6 +3724,15 @@ var PlayerState;
     PlayerState[PlayerState["Busy"] = 1] = "Busy";
     PlayerState[PlayerState["Ready"] = 2] = "Ready";
 })(PlayerState || (PlayerState = {}));
+var PlayerEnum;
+(function (PlayerEnum) {
+    PlayerEnum[PlayerEnum["None"] = 0] = "None";
+    PlayerEnum[PlayerEnum["Wild"] = 1] = "Wild";
+    PlayerEnum[PlayerEnum["Player1"] = 2] = "Player1";
+    PlayerEnum[PlayerEnum["Player2"] = 3] = "Player2";
+    PlayerEnum[PlayerEnum["Player3"] = 4] = "Player3";
+    PlayerEnum[PlayerEnum["Player4"] = 5] = "Player4";
+})(PlayerEnum || (PlayerEnum = {}));
 var TurnType;
 (function (TurnType) {
     TurnType[TurnType["None"] = 0] = "None";
@@ -4057,6 +4019,9 @@ function isAllBlastDead(allPlayerBlasts) {
 function isBlastAlive(blast) {
     return blast.hp > 0;
 }
+function getFirstAliveBlastIndex(allPlayerBlasts) {
+    return allPlayerBlasts.findIndex(blast => isBlastAlive(blast));
+}
 function calculateManaRecovery(maxMana, currentMana, useWait = false) {
     const normalRecovery = Math.floor(maxMana * 0.2);
     const waitRecovery = Math.floor(maxMana * 0.5);
@@ -4085,7 +4050,12 @@ function healStatusBlast(blast, status) {
 }
 // #region round logic
 function getFasterBlast(blast1, blast2) {
-    return blast1.speed > blast2.speed;
+    if (blast1.speed === blast2.speed) {
+        return Math.random() < 0.5;
+    }
+    else {
+        return blast1.speed > blast2.speed;
+    }
 }
 function getRandomMeteo() {
     const values = Object.values(Meteo).filter(value => typeof value === "number");
@@ -4139,9 +4109,14 @@ function performAttackSequence(state, dispatcher, nk, logger) {
     const p2Blast = state.p2Blasts[state.p2Index];
     const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
     const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
-    const p1First = p1Move.priority > p2Move.priority ||
-        (p1Move.priority === p2Move.priority && getFasterBlast(p1Blast, p2Blast));
-    logger.debug("P1 Move: %s, P2 Move: %s, P1 First: %s", p1Move.id, p2Move.id, p1First);
+    let p1First = false;
+    if (p1Move.priority === p2Move.priority) {
+        p1First = getFasterBlast(p1Blast, p2Blast);
+    }
+    else {
+        p1First = p1Move.priority > p2Move.priority;
+    }
+    state.turnStateData.p1TurnPriority = p1First;
     if (p1First) {
         executePlayerAttack(true, state, logger, dispatcher);
         logger.debug("P1 Attack executed");
@@ -4195,7 +4170,7 @@ function executePlayerAttack(isP1, state, logger, dispatcher) {
         meteo: state.meteo,
         dispatcher
     }, logger);
-    state = checkIfMatchContinue(state);
+    checkIfMatchContinue(state);
     return state;
 }
 function checkIfMatchContinue(state) {
@@ -4209,19 +4184,17 @@ function checkIfMatchContinue(state) {
         state.battleState = BattleState.End;
     }
     else if (!opponentAlive) {
-        state.battleState = BattleState.WaitForPlayerSwap;
+        state.battleState = BattleState.WaitingForPlayerSwap;
     }
     else if (allPlayerDead) {
         state.battleState = BattleState.End;
     }
     else if (!playerAlive) {
-        state.battleState = BattleState.WaitForPlayerSwap;
+        state.battleState = BattleState.WaitingForPlayerSwap;
     }
     return state;
 }
 function trySwapBlast(currentIndex, turnData, blasts, updateIndex, state, dispatcher) {
-    if (turnData.type !== TurnType.Swap)
-        return false;
     const targetIndex = clamp(turnData.index, 0, blasts.length - 1);
     if (currentIndex === targetIndex) {
         ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
@@ -4286,28 +4259,17 @@ const PvEinitMatch = function (ctx, logger, nk, params) {
         meteo: Meteo.None,
         offerTurnStateData: {
             offerOne: {
-                type: OfferType.None,
-                coinsAmount: 0,
-                gemsAmount: 0,
-                blast: null,
-                item: null,
+                type: RewardType.None,
             },
             offerTwo: {
-                type: OfferType.None,
-                coinsAmount: 0,
-                gemsAmount: 0,
-                blast: null,
-                item: null,
+                type: RewardType.None,
             },
             offerThree: {
-                type: OfferType.None,
-                coinsAmount: 0,
-                gemsAmount: 0,
-                blast: null,
-                item: null,
+                type: RewardType.None,
             }
         },
         turnStateData: {
+            p1TurnPriority: false,
             p1TurnData: {
                 type: TurnType.None,
                 index: 0,
@@ -4389,18 +4351,10 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             var newBlast = GetNewWildBlast(state, nk, logger);
             state.p2Index = 0;
             state.p2Blasts = [ConvertBlastToBlastEntity(newBlast)];
-            const newWildBlast = {
-                id: state.p2Blasts[state.p2Index].data_id,
-                exp: state.p2Blasts[state.p2Index].exp,
-                iv: state.p2Blasts[state.p2Index].iv,
-                boss: state.p2Blasts[state.p2Index].boss,
-                shiny: state.p2Blasts[state.p2Index].shiny,
-                activeMoveset: state.p2Blasts[state.p2Index].activeMoveset,
-                status: Status.None
-            };
             state.meteo = getRandomMeteo();
             const StartData = {
-                newBlastData: newWildBlast,
+                newBlastSquad: state.p2Blasts,
+                opponentName: "Wild Blast",
                 meteo: state.meteo,
                 turnDelay: 0,
             };
@@ -4573,38 +4527,28 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             ({ blast: state.p1Blasts[state.p1Index], otherBlast: state.p2Blasts[state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index], state.p2Blasts[state.p2Index]));
             ({ blast: state.p2Blasts[state.p2Index], otherBlast: state.p1Blasts[state.p1Index] } = applyStatusEffectAtEndOfTurn(state.p2Blasts[state.p2Index], state.p1Blasts[state.p1Index]));
             checkIfMatchContinue(state);
-            if (state.battleState == BattleState.End) {
-                if (isBlastAlive(state.p2Blasts[state.p2Index]))
-                    state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, false);
-                if (isBlastAlive(state.p1Blasts[state.p1Index]))
-                    state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, false);
-                dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
-                break;
-            }
-            else if (state.battleState === BattleState.WaitForPlayerSwap) {
+            if (isBlastAlive(state.p2Blasts[state.p2Index]))
                 state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, false);
+            if (isBlastAlive(state.p1Blasts[state.p1Index]))
+                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, false);
+            if (state.battleState == BattleState.End) {
                 dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
-                EndLoopDebug(logger, state);
-                break;
             }
             else {
                 state.battleState = BattleState.Waiting;
-                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, false);
-                state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, false);
-                //Send matchTurn
                 dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
             }
             EndLoopDebug(logger, state);
             break;
         // region WAIT_FOR_PLAYER_SWAP
-        case BattleState.WaitForPlayerSwap:
+        case BattleState.ResolvePlayerSwap:
             messages.forEach(function (message) {
                 var _a, _b;
                 const validOpCodes = [
                     OpCodes.PLAYER_CHANGE_BLAST,
                 ];
                 if (!validOpCodes.includes(message.opCode)) {
-                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.WaitForPlayerSwap);
+                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.ResolvePlayerSwap);
                     return;
                 }
                 logger.debug('______________ PLAYER SWAP BLAST ______________');
@@ -4619,11 +4563,11 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                     state.player1State = PlayerState.Busy;
                     var msgChangeBlast = clamp(action.data, 0, state.p1Blasts.length - 1);
                     if (state.p1Index == msgChangeBlast) {
-                        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.WaitForPlayerSwap);
+                        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.ResolvePlayerSwap);
                         return;
                     }
                     if (!isBlastAlive(state.p1Blasts[msgChangeBlast])) {
-                        ErrorFunc(state, "Cannot change actual blast with dead blast", dispatcher, BattleState.WaitForPlayerSwap);
+                        ErrorFunc(state, "Cannot change actual blast with dead blast", dispatcher, BattleState.ResolvePlayerSwap);
                         return;
                     }
                     state.p1Index = msgChangeBlast;
@@ -4652,11 +4596,7 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                     state.player1State = PlayerState.Busy;
                     var indexChooseOffer = clamp(JSON.parse(nk.binaryToString(message.data)), 0, 2);
                     let currentOffer = {
-                        type: OfferType.None,
-                        coinsAmount: 0,
-                        gemsAmount: 0,
-                        blast: null,
-                        item: null,
+                        type: RewardType.None,
                     };
                     switch (indexChooseOffer) {
                         case 0:
@@ -4670,23 +4610,23 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                             break;
                     }
                     switch (currentOffer.type) {
-                        case OfferType.Blast:
+                        case RewardType.Blast:
                             addBlast(nk, logger, state.player1Id, currentOffer.blast);
                             break;
-                        case OfferType.Item:
+                        case RewardType.Item:
                             addItem(nk, logger, state.player1Id, currentOffer.item);
                             break;
-                        case OfferType.Coin:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount);
+                        case RewardType.Coin:
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount, logger);
                             if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds"))
-                                updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount / 2);
+                                updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount / 2, logger);
                             break;
-                        case OfferType.Gem:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount);
+                        case RewardType.Gem:
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount, logger);
                             if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds"))
-                                updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount / 2);
+                                updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount / 2, logger);
                             break;
-                        case OfferType.None:
+                        case RewardType.None:
                             break;
                     }
                     var newBlast = GetNewWildBlast(state, nk, logger);
@@ -4727,9 +4667,9 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 }
                 if (state.indexProgression % 5 == 0 && state.indexProgression % 10 != 0) {
                     let items = {
-                        offerOne: getRandomOffer(nk, state, logger),
-                        offerTwo: getRandomOffer(nk, state, logger),
-                        offerThree: getRandomOffer(nk, state, logger),
+                        offerOne: getRandomReward(nk, state, logger),
+                        offerTwo: getRandomReward(nk, state, logger),
+                        offerThree: getRandomReward(nk, state, logger),
                     };
                     state.offerTurnStateData = items;
                     dispatcher.broadcastMessage(OpCodes.NEW_OFFER_TURN, JSON.stringify(items));
@@ -4801,9 +4741,9 @@ function PvEPlayerLeave(nk, state, logger) {
     }
     if (state.indexProgression > 1) {
         let totalCoins = 200 * (state.indexProgression - 1);
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins, logger);
         if (bonusAds)
-            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins / 2);
+            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins / 2, logger);
         writeBestRecordLeaderboard(nk, logger, state.player1Id, LeaderboardBestStageAreaId + getMetadataStat(nk, state.player1Id, "area"), state.indexProgression - 1);
     }
     if (bonusAds) {
@@ -4898,40 +4838,36 @@ function ApplyMoveEffects(move, getTargetBlast, setTargetBlast, getAttacker, set
 }
 //#endregion
 // region Offer Turn Logic
-function getRandomOffer(nk, state, logger) {
-    let offer = {
-        type: OfferType.Item,
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+function getRandomReward(nk, state, logger) {
+    let reward = {
+        type: RewardType.None,
     };
     const random = Math.floor(Math.random() * 4);
     switch (random) {
         case 0:
-            offer.type = OfferType.Blast;
+            reward.type = RewardType.Blast;
             var newBlast = GetNewWildBlast(state, nk, logger);
-            offer.blast = newBlast;
+            reward.blast = newBlast;
             break;
         case 1:
-            offer.type = OfferType.Item;
-            offer.item = getRandomItem(5);
+            reward.type = RewardType.Item;
+            reward.item = getRandomItem(5);
             break;
         case 2:
-            offer.type = OfferType.Coin;
-            offer.coinsAmount = Math.floor(Math.random() * 1000) + 1;
+            reward.type = RewardType.Coin;
+            reward.amount = Math.floor(Math.random() * 1000) + 1;
             break;
         case 3:
-            offer.type = OfferType.Gem;
-            offer.gemsAmount = Math.floor(Math.random() * 10) + 1;
+            reward.type = RewardType.Gem;
+            reward.amount = Math.floor(Math.random() * 10) + 1;
             break;
     }
-    return offer;
+    return reward;
 }
 function rpcFindOrCreatePvPBattle(context, logger, nk) {
     const limit = 10;
     const isAuthoritative = true;
-    const label = "PvPBattle"; // ← Doit correspondre au label défini dans matchInit
+    const label = "PvPBattle";
     const minSize = 1;
     const maxSize = 2;
     const matches = nk.matchList(limit, isAuthoritative, label, minSize, maxSize, "");
@@ -4960,9 +4896,10 @@ const PvPinitMatch = function (ctx, logger, nk, params) {
         p2Blasts: [],
         player2Platform: [],
         meteo: Meteo.None,
-        turnDelay: 3000,
+        turnDelay: 5000,
         turnTimer: null,
         turnStateData: {
+            p1TurnPriority: false,
             p1TurnData: {
                 type: TurnType.None,
                 index: 0,
@@ -4975,12 +4912,11 @@ const PvPinitMatch = function (ctx, logger, nk, params) {
                 moveDamage: 0,
                 moveEffects: [],
             },
-            catched: false
         }
     };
     return {
         state: PvPBattleData,
-        tickRate: 1,
+        tickRate: 2,
         label: ''
     };
 };
@@ -5009,32 +4945,33 @@ const PvPmatchJoin = function (ctx, logger, nk, dispatcher, tick, state, presenc
     return { state };
 };
 const PvPmatchLeave = function (ctx, logger, nk, dispatcher, tick, state, presences) {
-    for (let presence of presences) {
-        logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
-        if (state.player1Id == presence.userId) {
-            PvPPlayerLeave(nk, state, logger);
-            dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
+    if (ConnectedPlayers(state) > 1) {
+        for (let presence of presences) {
+            logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
+            const isP1 = presence.userId === state.player1Id;
+            const opponentId = isP1 ? state.player2Id : state.player1Id;
+            const opponentPresence = state.presences[opponentId];
+            PvPPlayerLeave(!isP1, nk, state, logger);
+            if (opponentPresence) {
+                dispatcher.broadcastMessage(OpCodes.OPPONENT_LEAVE, JSON.stringify(true), [opponentPresence]);
+            }
+            state.presences[presence.userId] = null;
         }
-        if (state.player2Id == presence.userId) {
-            PvPPlayerLeave(nk, state, logger);
-            dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
+        for (let userID in state.presences) {
+            if (state.presences[userID] === null) {
+                delete state.presences[userID];
+            }
         }
-        state.presences[presence.userId] = null;
     }
-    for (let userID in state.presences) {
-        if (state.presences[userID] === null) {
-            delete state.presences[userID];
-        }
-    }
-    if (ConnectedPlayers(state) === 0) {
+    else {
+        logger.info("Last player left, match will be closed.");
         return null;
     }
-    return {
-        state
-    };
+    logger.info("Player connected amount : %s", ConnectedPlayers(state));
+    return { state };
 };
 const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, messages) {
-    var _a;
+    var _a, _b;
     switch (state.battleState) {
         case BattleState.Start:
             logger.debug('______________ START BATTLE ______________');
@@ -5048,40 +4985,32 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             state.p1Blasts = getDeckBlast(nk, logger, state.player1Id);
             state.p2Blasts = getDeckBlast(nk, logger, state.player2Id);
             state.meteo = getRandomMeteo();
-            const p1_enemyBlast = {
-                id: state.p2Blasts[state.p2Index].data_id,
-                exp: state.p2Blasts[state.p2Index].exp,
-                iv: state.p2Blasts[state.p2Index].iv,
-                boss: state.p2Blasts[state.p2Index].boss,
-                shiny: state.p2Blasts[state.p2Index].shiny,
-                activeMoveset: state.p2Blasts[state.p2Index].activeMoveset,
-                status: Status.None,
-            };
-            const p2_enemyBlast = {
-                id: state.p1Blasts[state.p1Index].data_id,
-                exp: state.p1Blasts[state.p1Index].exp,
-                iv: state.p1Blasts[state.p1Index].iv,
-                boss: state.p1Blasts[state.p1Index].boss,
-                shiny: state.p1Blasts[state.p1Index].shiny,
-                activeMoveset: state.p1Blasts[state.p1Index].activeMoveset,
-                status: Status.None,
-            };
+            const p1Account = nk.accountGetId(state.player1Id);
+            const p2Account = nk.accountGetId(state.player2Id);
+            const p1Stat = p1Account.user.metadata.playerStats;
+            const p2Stat = p2Account.user.metadata.playerStats;
             const startDataP1 = {
-                newBlastData: p1_enemyBlast,
+                newBlastSquad: state.p2Blasts,
+                opponentName: p2Account.user.username,
+                opponentTrophy: getCurrencyInWallet(nk, state.player2Id, Currency.Trophies),
+                opponentStats: p2Stat,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
             };
             const startDataP2 = {
-                newBlastData: p2_enemyBlast,
+                newBlastSquad: state.p1Blasts,
+                opponentName: p1Account.user.username,
+                opponentTrophy: getCurrencyInWallet(nk, state.player1Id, Currency.Trophies),
+                opponentStats: p1Stat,
                 meteo: state.meteo,
                 turnDelay: state.turnDelay,
             };
             dispatcher.broadcastMessage(OpCodes.MATCH_START, JSON.stringify(startDataP1), [player1_presence]);
             dispatcher.broadcastMessage(OpCodes.MATCH_START, JSON.stringify(startDataP2), [player2_presence]);
             state.battleState = BattleState.Waiting;
-            logger.debug('______________ END START BATTLE ______________');
             break;
         case BattleState.Waiting:
+            logger.debug('______________ START WAITING ______________');
             messages.forEach(function (message) {
                 switch (message.opCode) {
                     case OpCodes.PLAYER_READY:
@@ -5117,6 +5046,7 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             }
             break;
         case BattleState.Ready:
+            logger.debug('______________ START READY ______________');
             const now = Date.now();
             for (const message of messages) {
                 const userId = message.sender.userId;
@@ -5150,11 +5080,17 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 }
                 state.player1State = PlayerState.Busy;
                 state.player2State = PlayerState.Busy;
-                state.battleState = BattleState.ResolveTurn;
+                if (!isBlastAlive(state.p1Blasts[state.p1Index]) || !isBlastAlive(state.p2Blasts[state.p2Index])) {
+                    state.battleState = BattleState.ResolvePlayerSwap;
+                }
+                else {
+                    state.battleState = BattleState.ResolveTurn;
+                }
                 state.turnTimer = null;
             }
             break;
         case BattleState.ResolveTurn: {
+            logger.debug('______________ START RESOLVE TURN ______________');
             logger.debug("Resolving turn: P1 Action: %s, P2 Action: %s", state.turnStateData.p1TurnData.type, state.turnStateData.p2TurnData.type);
             const p1 = state.turnStateData.p1TurnData;
             const p2 = state.turnStateData.p2TurnData;
@@ -5206,21 +5142,125 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             if (isBlastAlive(state.p1Blasts[state.p1Index])) {
                 state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, false);
             }
+            SendTurnState(dispatcher, state, OpCodes.NEW_BATTLE_TURN);
+            if (state.battleState !== BattleState.End && state.battleState !== BattleState.WaitingForPlayerSwap) {
+                state.battleState = BattleState.Waiting;
+            }
             EndLoopDebug(logger, state);
-            dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]]);
-            const reversedTurnStateData = {
-                p1TurnData: state.turnStateData.p2TurnData,
-                p2TurnData: state.turnStateData.p1TurnData,
-                catched: state.turnStateData.catched
-            };
-            dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]]);
+            break;
+        }
+        case BattleState.WaitingForPlayerSwap:
+            logger.debug('______________ START WAITING FOR PLAYER SWAP ______________');
+            messages.forEach(function (message) {
+                switch (message.opCode) {
+                    case OpCodes.PLAYER_READY:
+                        const userId = message.sender.userId;
+                        if (userId === state.player1Id) {
+                            state.player1State = PlayerState.Ready;
+                            logger.debug("P1 Ready");
+                        }
+                        else if (userId === state.player2Id) {
+                            state.player2State = PlayerState.Ready;
+                            logger.debug("P2 Ready");
+                        }
+                        break;
+                }
+            });
+            if (state.player1State === PlayerState.Ready && state.player2State === PlayerState.Ready) {
+                dispatcher.broadcastMessage(OpCodes.PLAYER_READY_MUST_CHANGE);
+                state.battleState = BattleState.ReadyForPlayerSwap;
+                state.player1State = PlayerState.Busy;
+                state.player2State = PlayerState.Busy;
+                state.turnStateData.p1TurnData = {
+                    type: TurnType.None,
+                    index: 0,
+                    moveDamage: 0,
+                    moveEffects: [],
+                };
+                state.turnStateData.p2TurnData = {
+                    type: TurnType.None,
+                    index: 0,
+                    moveDamage: 0,
+                    moveEffects: [],
+                };
+            }
+            break;
+        case BattleState.ReadyForPlayerSwap: {
+            logger.debug('______________ START READY FOR PLAYER SWAP ______________');
+            const now = Date.now();
+            for (const message of messages) {
+                const validOpCodes = [
+                    OpCodes.PLAYER_CHANGE_BLAST,
+                ];
+                if (!validOpCodes.includes(message.opCode)) {
+                    ErrorFunc(state, "OP CODE NOT VALID", dispatcher, BattleState.ResolvePlayerSwap);
+                    break;
+                }
+                const userId = message.sender.userId;
+                const parsed = JSON.parse(nk.binaryToString(message.data));
+                const action = {
+                    type: parseEnum(parsed.type.toString(), TurnType),
+                    data: (_b = parsed.data) !== null && _b !== void 0 ? _b : 0,
+                };
+                if (userId === state.player1Id) {
+                    if (isBlastAlive(state.p1Blasts[state.p1Index])) {
+                        ErrorFunc(state, "Your blast is alive", dispatcher, BattleState.ReadyForPlayerSwap);
+                        break;
+                    }
+                    state.turnStateData.p1TurnData.type = action.type;
+                    state.turnStateData.p1TurnData.index = action.data;
+                }
+                if (userId === state.player2Id) {
+                    if (isBlastAlive(state.p2Blasts[state.p2Index])) {
+                        ErrorFunc(state, "Your blast is alive", dispatcher, BattleState.ReadyForPlayerSwap);
+                        break;
+                    }
+                    state.turnStateData.p2TurnData.type = action.type;
+                    state.turnStateData.p2TurnData.index = action.data;
+                }
+            }
+            if (!state.turnTimer) {
+                state.turnTimer = now + state.turnDelay;
+            }
+            const p1Ready = isBlastAlive(state.p1Blasts[state.p1Index]) || state.turnStateData.p1TurnData.type === TurnType.Swap;
+            const p2Ready = isBlastAlive(state.p2Blasts[state.p2Index]) || state.turnStateData.p2TurnData.type === TurnType.Swap;
+            if (now >= state.turnTimer || (p1Ready && p2Ready)) {
+                let firstIndex = 0;
+                if (!isBlastAlive(state.p1Blasts[state.p1Index]) && state.turnStateData.p1TurnData.type != TurnType.Swap) {
+                    state.turnStateData.p1TurnData.type = TurnType.Swap;
+                    state.player1State = PlayerState.Busy;
+                    firstIndex = getFirstAliveBlastIndex(state.p1Blasts);
+                    state.turnStateData.p1TurnData.index = firstIndex;
+                }
+                if (!isBlastAlive(state.p2Blasts[state.p2Index]) && state.turnStateData.p2TurnData.type != TurnType.Swap) {
+                    state.turnStateData.p2TurnData.type = TurnType.Swap;
+                    state.player2State = PlayerState.Busy;
+                    firstIndex = getFirstAliveBlastIndex(state.p2Blasts);
+                    state.turnStateData.p2TurnData.index = firstIndex;
+                }
+                state.battleState = BattleState.ResolvePlayerSwap;
+                state.turnTimer = null;
+            }
+            break;
+        }
+        case BattleState.ResolvePlayerSwap: {
+            logger.debug('______________ START WAIT FOR PLAYER SWAP ______________');
+            const p1 = state.turnStateData.p1TurnData;
+            const p2 = state.turnStateData.p2TurnData;
+            if (p1.type === TurnType.Swap) {
+                if (trySwapBlast(state.p1Index, p1, state.p1Blasts, i => state.p1Index = i, state, dispatcher))
+                    break;
+            }
+            if (p2.type === TurnType.Swap) {
+                if (trySwapBlast(state.p2Index, p2, state.p2Blasts, i => state.p2Index = i, state, dispatcher))
+                    break;
+            }
+            SendTurnState(dispatcher, state, OpCodes.PLAYER_MUST_CHANGE_BLAST);
             state.battleState = BattleState.Waiting;
             break;
         }
-        case BattleState.WaitForPlayerSwap:
-            logger.debug("Waiting for player swap");
-            break;
         case BattleState.End:
+            logger.debug('______________ START END ______________');
             const allP1BlastFainted = isAllBlastDead(state.p1Blasts);
             const allP2BlastFainted = isAllBlastDead(state.p2Blasts);
             if (allP1BlastFainted && allP2BlastFainted) {
@@ -5233,18 +5273,17 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             if (allP1BlastFainted) {
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player1Id]]);
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player2Id]]);
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20);
+                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
+                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
                 return null;
             }
             if (allP2BlastFainted) {
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player1Id]]);
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player2Id]]);
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20);
+                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
+                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
                 return null;
             }
-            logger.debug('______________ END BATTLE ______________');
     }
     if (ConnectedPlayers(state) === 0) {
         logger.debug('Running empty ticks: %d', state.emptyTicks);
@@ -5270,12 +5309,38 @@ const PvPmatchTerminate = function (ctx, logger, nk, dispatcher, tick, state, gr
         state
     };
 };
-function PvPPlayerLeave(nk, state, logger) {
-    let bonusAds = getMetadataStat(nk, state.player1Id, "pvpBattleButtonAds");
-    updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20);
-    updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000);
-    if (bonusAds) {
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000 / 2);
+function SendTurnState(dispatcher, state, OpCodes) {
+    dispatcher.broadcastMessage(OpCodes, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]]);
+    const reversedTurnStateData = {
+        p1TurnPriority: !state.turnStateData.p1TurnPriority,
+        p1TurnData: state.turnStateData.p2TurnData,
+        p2TurnData: state.turnStateData.p1TurnData,
+    };
+    dispatcher.broadcastMessage(OpCodes, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]]);
+}
+function PvPPlayerLeave(p1Win, nk, state, logger) {
+    if (p1Win) {
+        incrementMetadataStat(nk, state.player1Id, "win", 1);
+        incrementMetadataStat(nk, state.player2Id, "loose", 1);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000, logger);
+    }
+    else {
+        incrementMetadataStat(nk, state.player2Id, "win", 1);
+        incrementMetadataStat(nk, state.player1Id, "loose", 1);
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 1000, logger);
+    }
+    let bonusP1Ads = getMetadataStat(nk, state.player1Id, "pvpBattleButtonAds");
+    let bonusP2Ads = getMetadataStat(nk, state.player2Id, "pvpBattleButtonAds");
+    if (bonusP1Ads) {
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 500, logger);
         setMetadataStat(nk, state.player1Id, "pvpBattleButtonAds", false);
+    }
+    if (bonusP2Ads) {
+        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 500, logger);
+        setMetadataStat(nk, state.player2Id, "pvpBattleButtonAds", false);
     }
 }

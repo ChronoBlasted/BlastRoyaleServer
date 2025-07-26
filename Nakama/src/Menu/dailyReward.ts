@@ -4,10 +4,10 @@ const DailyRewardCollectionName = 'reward';
 const DailyRewardCollectionKey = 'daily';
 
 interface Reward {
-    coinsReceived: number
-    gemsReceived: number
-    blastReceived: Blast | null
-    itemReceived: Item | null
+    type: RewardType
+    amount?: number
+    blast?: Blast
+    item?: Item
 }
 
 interface DailyRewardData {
@@ -79,10 +79,7 @@ function rpcCanClaimDailyReward(context: nkruntime.Context, logger: nkruntime.Lo
 function rpcClaimDailyReward(context: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
 
     var reward: Reward = {
-        coinsReceived: 0,
-        gemsReceived: 0,
-        blastReceived: null,
-        itemReceived: null,
+        type: RewardType.None
     };
 
     var dailyReward = getLastDailyRewardObject(context, logger, nk, payload) as DailyRewardData;
@@ -100,8 +97,8 @@ function rpcClaimDailyReward(context: nkruntime.Context, logger: nkruntime.Logge
             userId: context.userId,
         }
 
-        if (reward.coinsReceived != 0) {
-            updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived,logger);
+        if (reward.type == RewardType.Coin) {
+            updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.amount!,logger);
 
             notification = {
                 code: notificationOpCodes.CURENCY,
@@ -119,8 +116,8 @@ function rpcClaimDailyReward(context: nkruntime.Context, logger: nkruntime.Logge
             }
 
         }
-        if (reward.gemsReceived != 0) {
-            updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived,logger);
+        if (reward.type == RewardType.Gem) {
+            updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.amount!,logger);
 
             notification = {
                 code: notificationOpCodes.CURENCY,
@@ -138,12 +135,12 @@ function rpcClaimDailyReward(context: nkruntime.Context, logger: nkruntime.Logge
             }
         }
 
-        if (reward.blastReceived != null) {
-            addBlast(nk, logger, context.userId, reward.blastReceived);
+        if (reward.type == RewardType.Blast) {
+            addBlast(nk, logger, context.userId, reward.blast!);
         }
 
-        if (reward.itemReceived != null) {
-            addItem(nk, logger, context.userId, reward.itemReceived);
+        if (reward.type == RewardType.Item) {
+            addItem(nk, logger, context.userId, reward.item!);
         }
 
         dailyReward.lastClaimUnix = msecToSec(Date.now());
@@ -185,14 +182,14 @@ function getDayReward(totalDay: number): Reward {
 // Data
 
 const allReward: Reward[] = [
-    { coinsReceived: 0, gemsReceived: 5, blastReceived: null, itemReceived: null },
-    { coinsReceived: 750, gemsReceived: 0, blastReceived: null, itemReceived: null },
-    { coinsReceived: 0, gemsReceived: 15, blastReceived: null, itemReceived: null },
-    { coinsReceived: 2000, gemsReceived: 0, blastReceived: null, itemReceived: null },
-    { coinsReceived: 0, gemsReceived: 30, blastReceived: null, itemReceived: null },
-    { coinsReceived: 5000, gemsReceived: 0, blastReceived: null, itemReceived: null },
+    { type:RewardType.Gem, amount: 5 },
+    { type:RewardType.Coin, amount: 750 },
+    { type:RewardType.Gem, amount: 15 },
+    { type:RewardType.Coin, amount: 2000 },
+    { type:RewardType.Gem, amount: 30 },
+    { type:RewardType.Coin, amount: 5000 },
     {
-        coinsReceived: 0, gemsReceived: 0, blastReceived: {
+        type:RewardType.Blast,blast: {
             uuid: generateUUID(),
             data_id: Clawball.id,
             exp: calculateExperienceFromLevel(10),
@@ -200,7 +197,7 @@ const allReward: Reward[] = [
             boss: false,
             shiny: true,
             activeMoveset: getRandomActiveMoveset(Clawball, calculateExperienceFromLevel(10))
-        }, itemReceived: null
+        }
     },
 ];
 

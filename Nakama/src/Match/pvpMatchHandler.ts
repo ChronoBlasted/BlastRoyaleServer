@@ -35,6 +35,7 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         emptyTicks: 0,
         presences: {},
         battleState: BattleState.None,
+        winner: WinnerEnum.None,
 
         player1State: PlayerState.Busy,
         player1Id: "",
@@ -134,8 +135,13 @@ const PvPmatchLeave = function (
 
             PvPPlayerLeave(!isP1, nk, state, logger);
 
+            let endData: EndStateData = {
+                win :true,
+                trophyRewards:20,
+            }
+
             if (opponentPresence) {
-                dispatcher.broadcastMessage(OpCodes.OPPONENT_LEAVE, JSON.stringify(true), [opponentPresence]);
+                dispatcher.broadcastMessage(OpCodes.OPPONENT_LEAVE, JSON.stringify(endData), [opponentPresence]);
             }
 
             state.presences[presence.userId] = null;
@@ -536,39 +542,35 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         case BattleState.End:
             logger.debug('______________ START END ______________');
 
-            const allP1BlastFainted = isAllBlastDead(state.p1Blasts);
-            const allP2BlastFainted = isAllBlastDead(state.p2Blasts);
+            let endData: EndStateData = {
+                win: true,
+                trophyRewards: 0
+            }
 
-            if (allP1BlastFainted && allP2BlastFainted) {
+            if (state.winner == WinnerEnum.Tie) {
 
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endData), [
                     state.presences[state.player1Id]!,
                     state.presences[state.player2Id]!
                 ]);
+            } else if (state.winner === WinnerEnum.Player1 || state.winner === WinnerEnum.Player2) {
+                const winnerId = state.winner === WinnerEnum.Player1 ? state.player1Id : state.player2Id;
+                const loserId = state.winner === WinnerEnum.Player1 ? state.player2Id : state.player1Id;
 
-                return null;
+                // Gagnant
+                endData.win = true;
+                endData.trophyRewards = 20;
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endData), [state.presences[winnerId]!]);
+                updateWalletWithCurrency(nk, winnerId, Currency.Trophies, endData.trophyRewards, logger);
+
+                // Perdant
+                endData.win = false;
+                endData.trophyRewards = -20;
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endData), [state.presences[loserId]!]);
+                updateWalletWithCurrency(nk, loserId, Currency.Trophies, endData.trophyRewards, logger);
             }
 
-            if (allP1BlastFainted) {
-
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player1Id]!]);
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player2Id]!]);
-
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
-
-                return null;
-            }
-
-            if (allP2BlastFainted) {
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player1Id]!]);
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player2Id]!]);
-
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
-
-                return null;
-            }
+            return null;
     }
 
     if (ConnectedPlayers(state) === 0) {

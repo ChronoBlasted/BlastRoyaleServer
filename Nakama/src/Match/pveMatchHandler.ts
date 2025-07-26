@@ -13,9 +13,9 @@ interface PvEBattleData extends BattleData {
 }
 
 interface OfferTurnStateData {
-    offerOne: Offer;
-    offerTwo: Offer;
-    offerThree: Offer;
+    offerOne: Reward;
+    offerTwo: Reward;
+    offerThree: Reward;
 }
 
 
@@ -30,6 +30,7 @@ const PvEinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         emptyTicks: 0,
         presences: {},
         battleState: BattleState.Start,
+        winner: WinnerEnum.None,
 
         player1State: PlayerState.Busy,
         player1Id: "",
@@ -54,25 +55,13 @@ const PvEinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
         offerTurnStateData: {
             offerOne: {
-                type: OfferType.None,
-                coinsAmount: 0,
-                gemsAmount: 0,
-                blast: null,
-                item: null,
+                type: RewardType.None,
             },
             offerTwo: {
-                type: OfferType.None,
-                coinsAmount: 0,
-                gemsAmount: 0,
-                blast: null,
-                item: null,
+                type: RewardType.None,
             },
             offerThree: {
-                type: OfferType.None,
-                coinsAmount: 0,
-                gemsAmount: 0,
-                blast: null,
-                item: null,
+                type: RewardType.None,
             }
         },
 
@@ -319,9 +308,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     break;
                 //region Player Use Item
                 case TurnType.Item:
-
-                    logger.debug("selected Blast %f",state.turnStateData.p1TurnData.itemUse?.index_blast)
-                    logger.debug("selected Item %f",state.turnStateData.p1TurnData.itemUse?.index_item)
+                    
                     let msgItem = {} as ItemUseJSON;
                     msgItem = state.turnStateData.p1TurnData.itemUse!;
                     msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
@@ -511,12 +498,8 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                     var indexChooseOffer = clamp(JSON.parse(nk.binaryToString(message.data)), 0, 2);
 
-                    let currentOffer: Offer = {
-                        type: OfferType.None,
-                        coinsAmount: 0,
-                        gemsAmount: 0,
-                        blast: null,
-                        item: null,
+                    let currentOffer: Reward = {
+                        type: RewardType.None,
                     };
 
                     switch (indexChooseOffer) {
@@ -532,23 +515,23 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     }
 
                     switch (currentOffer.type) {
-                        case OfferType.Blast:
+                        case RewardType.Blast:
                             addBlast(nk, logger, state.player1Id, currentOffer.blast!);
                             break;
-                        case OfferType.Item:
+                        case RewardType.Item:
                             addItem(nk, logger, state.player1Id, currentOffer.item!);
                             break;
-                        case OfferType.Coin:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount,logger);
+                        case RewardType.Coin:
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount!,logger);
 
-                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.coinsAmount / 2,logger)
+                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount! / 2,logger)
                             break;
-                        case OfferType.Gem:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount,logger);
+                        case RewardType.Gem:
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount!,logger);
 
-                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.gemsAmount / 2,logger)
+                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount! / 2,logger)
                             break;
-                        case OfferType.None:
+                        case RewardType.None:
                             break;
                     }
 
@@ -580,11 +563,8 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             const p1_blast = state.p1Blasts[state.p1Index]!;
             const wildBlast = state.p2Blasts!;
-            const allPlayerBlastFainted = isAllBlastDead(state.p1Blasts);
 
-            const wildAlive = isBlastAlive(wildBlast[state.p2Index]);
-
-            if (wildAlive == false || state.turnStateData.catched) {
+            if (state.winner == WinnerEnum.Player1 || state.turnStateData.catched) {
 
                 state.indexProgression++;
 
@@ -605,9 +585,9 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 if (state.indexProgression % 5 == 0 && state.indexProgression % 10 != 0) {
                     let items: OfferTurnStateData = {
-                        offerOne: getRandomOffer(nk, state, logger),
-                        offerTwo: getRandomOffer(nk, state, logger),
-                        offerThree: getRandomOffer(nk, state, logger),
+                        offerOne: getRandomReward(nk, state, logger),
+                        offerTwo: getRandomReward(nk, state, logger),
+                        offerThree: getRandomReward(nk, state, logger),
                     }
 
                     state.offerTurnStateData = items;
@@ -646,7 +626,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 EndLoopDebug(logger, state);
 
             }
-            else if (allPlayerBlastFainted) {
+            else if (state.winner == WinnerEnum.Player2) {
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false));
                 PvEPlayerLeave(nk, state, logger);
 
@@ -866,36 +846,32 @@ function ApplyMoveEffects(
 //#endregion
 
 // region Offer Turn Logic
-function getRandomOffer(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkruntime.Logger): Offer {
-    let offer: Offer = {
-        type: OfferType.Item,
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+function getRandomReward(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkruntime.Logger): Reward {
+    let reward: Reward = {
+        type: RewardType.None,
     };
 
     const random = Math.floor(Math.random() * 4);
     switch (random) {
         case 0:
-            offer.type = OfferType.Blast;
+            reward.type = RewardType.Blast;
             var newBlast = GetNewWildBlast(state, nk, logger);
-            offer.blast = newBlast;
+            reward.blast = newBlast;
             break;
         case 1:
-            offer.type = OfferType.Item;
-            offer.item = getRandomItem(5);
+            reward.type = RewardType.Item;
+            reward.item = getRandomItem(5);
             break;
         case 2:
-            offer.type = OfferType.Coin;
-            offer.coinsAmount = Math.floor(Math.random() * 1000) + 1;
+            reward.type = RewardType.Coin;
+            reward.amount = Math.floor(Math.random() * 1000) + 1;
             break;
         case 3:
-            offer.type = OfferType.Gem;
-            offer.gemsAmount = Math.floor(Math.random() * 10) + 1;
+            reward.type = RewardType.Gem;
+            reward.amount = Math.floor(Math.random() * 10) + 1;
             break;
     }
 
-    return offer;
+    return reward;
 }
 

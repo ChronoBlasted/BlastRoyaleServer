@@ -170,12 +170,12 @@ function rpcClaimDailyQuestReward(context: nkruntime.Context, logger: nkruntime.
 
   const reward = rewardList[data.rewardCount];
 
-  if (reward.coinsReceived != 0) {
-    updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.coinsReceived, logger);
+  if (reward.type == RewardType.Coin) {
+    updateWalletWithCurrency(nk, context.userId, Currency.Coins, reward.amount!, logger);
   }
 
-  if (reward.gemsReceived != 0) {
-    updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.gemsReceived, logger);
+  if (reward.type == RewardType.Gem) {
+    updateWalletWithCurrency(nk, context.userId, Currency.Gems, reward.amount!, logger);
   }
 
   data.rewardCount++;
@@ -223,9 +223,9 @@ function rpcGetDailyQuestRewards(context: nkruntime.Context, logger: nkruntime.L
 
 
 const rewardList: Reward[] = [
-  { coinsReceived: 0, gemsReceived: 2, blastReceived: null, itemReceived: null },
-  { coinsReceived: 2000, gemsReceived: 0, blastReceived: null, itemReceived: null },
-  { coinsReceived: 10000, gemsReceived: 0, blastReceived: null, itemReceived: null },
-  { coinsReceived: 0, gemsReceived: 10, blastReceived: null, itemReceived: null },
+    { type:RewardType.Gem, amount: 2 },
+    { type:RewardType.Coin, amount: 2000 },
+    { type:RewardType.Coin, amount: 5000 },
+    { type:RewardType.Gem, amount: 5 },
 ];
 

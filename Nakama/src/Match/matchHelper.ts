@@ -20,6 +20,15 @@ enum PlayerState {
     Ready,
 }
 
+enum WinnerEnum {
+    None,
+    Player1,
+    Player2,
+    Player3,
+    Player4,
+    Tie
+}
+
 enum TurnType {
     None,
     Attack,
@@ -35,18 +44,16 @@ interface BattleData {
     presences: { [userId: string]: nkruntime.Presence | null }
 
     battleState: BattleState;
+    winner: WinnerEnum;
 
     player1State: PlayerState;
     player1Id: string;
-
-    p1Index: number;
-    p1Blasts: BlastEntity[];
-
-    player1Platform: Type[];
-
     player2State: PlayerState;
     player2Id: string;
 
+    p1Index: number;
+    p1Blasts: BlastEntity[];
+    player1Platform: Type[];
     p2Index: number;
     p2Blasts: BlastEntity[];
     player2Platform: Type[];
@@ -83,6 +90,11 @@ interface StartStateData {
     opponentStats?: PlayerStat;
     meteo: Meteo;
     turnDelay: number;
+}
+
+interface EndStateData {
+    win: boolean;
+    trophyRewards: number;
 }
 
 interface NewBlastData {
@@ -626,19 +638,25 @@ function checkIfMatchContinue(state: BattleData): BattleData {
     const playerBlast = state.p1Blasts[state.p1Index]!;
     const opponentBlast = state.p2Blasts![state.p2Index];
 
-    const opponentAlive = isBlastAlive(opponentBlast);
-    const playerAlive = isBlastAlive(playerBlast);
+    const p1Alive = isBlastAlive(playerBlast);
+    const p2Alive = isBlastAlive(opponentBlast);
 
-    const allPlayerDead = isAllBlastDead(state.p1Blasts);
-    const allOpponentDead = isAllBlastDead(state.p2Blasts!);
+    const allP1Dead = isAllBlastDead(state.p1Blasts);
+    const allP2Dead = isAllBlastDead(state.p2Blasts!);
 
-    if (allOpponentDead) {
+    if (allP1Dead && allP2Dead) {
         state.battleState = BattleState.End;
-    } else if (!opponentAlive) {
+        state.winner = WinnerEnum.Tie;
+    }
+    else if (allP2Dead) {
+        state.battleState = BattleState.End;
+        state.winner = WinnerEnum.Player1;
+    } else if (!p2Alive) {
         state.battleState = BattleState.WaitingForPlayerSwap;
-    } else if (allPlayerDead) {
+    } else if (allP1Dead) {
         state.battleState = BattleState.End;
-    } else if (!playerAlive) {
+        state.winner = WinnerEnum.Player2;
+    } else if (!p1Alive) {
         state.battleState = BattleState.WaitingForPlayerSwap;
     }
 

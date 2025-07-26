@@ -168,10 +168,10 @@ function generateRandomDailyShop(nk: nkruntime.Nakama, userId: string, logger: n
     return dailyShop;
 }
 
-function getRandomOfferType(): OfferType {
-    const offerTypeValues = Object.values(OfferType);
+function getRandomOfferType(): RewardType {
+    const offerTypeValues = Object.values(RewardType);
     const randomIndex = Math.floor(Math.random() * offerTypeValues.length);
-    return offerTypeValues[randomIndex] as OfferType;
+    return offerTypeValues[randomIndex] as RewardType;
 }
 
 function getRandomStoreOffer(nk: nkruntime.Nakama, userId: string, logger: nkruntime.Logger): StoreOffer {
@@ -179,11 +179,7 @@ function getRandomStoreOffer(nk: nkruntime.Nakama, userId: string, logger: nkrun
     let storeOffer: StoreOffer = {
         offer_id: -1,
         offer: {
-            type: OfferType.None,
-            coinsAmount: 0,
-            gemsAmount: 0,
-            blast: null,
-            item: null,
+            type: RewardType.None,
         },
         price: 0,
         currency: Currency.Coins,
@@ -191,12 +187,12 @@ function getRandomStoreOffer(nk: nkruntime.Nakama, userId: string, logger: nkrun
     };
 
     if (Math.random() < 0.5) {
-        storeOffer.offer.type = OfferType.Blast;
+        storeOffer.offer.type = RewardType.Blast;
         storeOffer.offer.blast = getRandomBlastEntityInAllPlayerArea(userId, nk, false);
         storeOffer.price = getBlastPrice(storeOffer.offer.blast);
         storeOffer.currency = Currency.Coins;
     } else {
-        storeOffer.offer.type = OfferType.Item;
+        storeOffer.offer.type = RewardType.Item;
         storeOffer.offer.item = getRandomItem(1 + Math.floor(Math.random() * 10));
 
         storeOffer.price = getItemPrice(storeOffer.offer.item) * storeOffer.offer.item.amount;

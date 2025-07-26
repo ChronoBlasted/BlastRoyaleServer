@@ -1,23 +1,15 @@
-enum OfferType {
+enum RewardType {
     None,
     Coin,
     Gem,
+    Trophy,
     Blast,
     Item,
 }
 
-interface Offer {
-    type: OfferType
-    coinsAmount: number
-    gemsAmount: number
-    blast: Blast | null
-    item: Item | null
-}
-
 interface StoreOffer {
     offer_id: number
-    offer: Offer
-
+    offer: Reward
     price: number
     currency: Currency
     isAlreadyBuyed: boolean
@@ -33,11 +25,7 @@ const blastTrap: Item = {
 const blastTrapOffer: StoreOffer = {
     offer_id: 1,
     offer: {
-        type: OfferType.Item,
-
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
+        type: RewardType.Item,
         item: blastTrap,
     },
 
@@ -54,11 +42,7 @@ const superBlastTrap: Item = {
 const superBlastTrapOffer: StoreOffer = {
     offer_id: 2,
     offer: {
-        type: OfferType.Item,
-
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
+        type: RewardType.Item,
         item: superBlastTrap,
     },
     currency: Currency.Coins,
@@ -74,11 +58,7 @@ const hyperBlastTrap: Item = {
 const hyperBlastTrapOffer: StoreOffer = {
     offer_id: 3,
     offer: {
-        type: OfferType.Item,
-
-        coinsAmount: 0,
-        gemsAmount: 0,
-        blast: null,
+        type: RewardType.Item,
         item: hyperBlastTrap,
     },
 
@@ -123,12 +103,9 @@ const rpcBuyTrapOffer: nkruntime.RpcFunction =
 const coinsOffer1: StoreOffer = {
     offer_id: 4,
     offer: {
-        type: OfferType.Coin,
+        type: RewardType.Coin,
 
-        coinsAmount: 20000,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+        amount: 20000,
     },
 
     currency: Currency.Gems,
@@ -139,13 +116,8 @@ const coinsOffer1: StoreOffer = {
 const coinsOffer2: StoreOffer = {
     offer_id: 5,
     offer: {
-
-        type: OfferType.Coin,
-
-        coinsAmount: 65000,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+        type: RewardType.Coin,
+        amount: 65000,
     },
 
     currency: Currency.Gems,
@@ -156,15 +128,11 @@ const coinsOffer2: StoreOffer = {
 const coinsOffer3: StoreOffer = {
     offer_id: 6,
     offer: {
-        type: OfferType.Coin,
-
-        coinsAmount: 140000,
-        gemsAmount: 0,
-        blast: null,
-        item: null,
+        type: RewardType.Coin,
+        amount: 140000,
     },
-    currency: Currency.Gems,
 
+    currency: Currency.Gems,
     price: 600,
     isAlreadyBuyed: false,
 };
@@ -189,7 +157,7 @@ const rpcBuyCoinOffer: nkruntime.RpcFunction =
         try {
             nk.walletUpdate(ctx.userId, { [storeOffer.currency]: -storeOffer.price });
 
-            nk.walletUpdate(ctx.userId, { [Currency.Coins]: storeOffer.offer.coinsAmount });
+            nk.walletUpdate(ctx.userId, { [Currency.Coins]: storeOffer.offer.amount! });
         } catch (error) {
             logger.error('error buying blast trap: %s', error);
             throw error;
@@ -203,12 +171,8 @@ const rpcBuyCoinOffer: nkruntime.RpcFunction =
 const gemsOffer1: StoreOffer = {
     offer_id: 7,
     offer: {
-        type: OfferType.Gem,
-
-        coinsAmount: 0,
-        gemsAmount: 160,
-        blast: null,
-        item: null,
+        type: RewardType.Gem,
+        amount: 160,
     },
     currency: Currency.Hard,
     price: 0,
@@ -218,13 +182,8 @@ const gemsOffer1: StoreOffer = {
 const gemsOffer2: StoreOffer = {
     offer_id: 8,
     offer: {
-        type: OfferType.Gem,
-
-        coinsAmount: 0,
-        gemsAmount: 500,
-        blast: null,
-        item: null,
-
+        type: RewardType.Gem,
+        amount: 500,
     },
     currency: Currency.Hard,
     price: 0,
@@ -234,13 +193,8 @@ const gemsOffer2: StoreOffer = {
 const gemsOffer3: StoreOffer = {
     offer_id: 9,
     offer: {
-        type: OfferType.Gem,
-
-        coinsAmount: 0,
-        gemsAmount: 1200,
-        blast: null,
-        item: null,
-
+        type: RewardType.Gem,
+        amount: 1200,
     },
     currency: Currency.Hard,
     price: 0,
@@ -250,13 +204,8 @@ const gemsOffer3: StoreOffer = {
 const gemsOffer4: StoreOffer = {
     offer_id: 10,
     offer: {
-        type: OfferType.Gem,
-
-        coinsAmount: 0,
-        gemsAmount: 2500,
-        blast: null,
-        item: null,
-
+        type: RewardType.Gem,
+        amount: 2500,
     },
     currency: Currency.Hard,
     price: 0,
@@ -266,13 +215,8 @@ const gemsOffer4: StoreOffer = {
 const gemsOffer5: StoreOffer = {
     offer_id: 11,
     offer: {
-        type: OfferType.Gem,
-
-        coinsAmount: 0,
-        gemsAmount: 6500,
-        blast: null,
-        item: null,
-
+        type: RewardType.Gem,
+        amount: 6500,
     },
     currency: Currency.Hard,
     price: 0,
@@ -282,14 +226,8 @@ const gemsOffer5: StoreOffer = {
 const gemsOffer6: StoreOffer = {
     offer_id: 12,
     offer: {
-
-        type: OfferType.Gem,
-
-        coinsAmount: 0,
-        gemsAmount: 14000,
-        blast: null,
-        item: null,
-
+        type: RewardType.Gem,
+        amount: 14000,
     },
     currency: Currency.Hard,
 
@@ -321,7 +259,7 @@ const rpcBuyGemOffer: nkruntime.RpcFunction =
             // Verif
             // Achat in app
 
-            nk.walletUpdate(ctx.userId, { [Currency.Gems]: storeOffer.offer.gemsAmount });
+            nk.walletUpdate(ctx.userId, { [Currency.Gems]: storeOffer.offer.amount! });
         } catch (error) {
             logger.error('error buying blast trap: %s', error);
             throw error;

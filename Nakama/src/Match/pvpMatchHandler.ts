@@ -126,7 +126,8 @@ const PvPmatchLeave = function (
 ): { state: PvPBattleData } | null {
 
     for (let presence of presences) {
-        logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
+        PlayerActionLeave(presence.userId === state.player2Id, nk, state, logger, dispatcher, OpCodes.OPPONENT_LEAVE);
+        return null;
     }
 
     for (let presence of presences) {
@@ -268,7 +269,7 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 };
 
                 if (action.type == TurnType.Leave) {
-                    PlayerActionLeave(userId === state.player1Id, nk, state, logger, dispatcher);
+                    PlayerActionLeave(userId === state.player1Id, nk, state, logger, dispatcher, OpCodes.MATCH_END);
                     return null;
                 }
 
@@ -353,9 +354,9 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             if (p1.type === TurnType.Attack && p2.type === TurnType.Attack) {
                 performAttackSequence(state, dispatcher, nk, logger);
             } else if (p1.type === TurnType.Attack) {
-                executePlayerAttack(true, state, logger,nk, dispatcher);
+                executePlayerAttack(true, state, logger, nk, dispatcher);
             } else if (p2.type === TurnType.Attack) {
-                executePlayerAttack(false, state, logger,nk,  dispatcher);
+                executePlayerAttack(false, state, logger, nk, dispatcher);
             }
 
             if (p1.type === TurnType.Wait) {
@@ -545,21 +546,9 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     state.presences[state.player1Id]!,
                     state.presences[state.player2Id]!
                 ]);
-            } else if (state.winner === WinnerEnum.Player1 || state.winner === WinnerEnum.Player2) {
-                const winnerId = state.winner === WinnerEnum.Player1 ? state.player1Id : state.player2Id;
-                const loserId = state.winner === WinnerEnum.Player1 ? state.player2Id : state.player1Id;
-
-                // Gagnant
-                endData.win = true;
-                endData.trophyRewards = 20;
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endData), [state.presences[winnerId]!]);
-                updateWalletWithCurrency(nk, winnerId, Currency.Trophies, endData.trophyRewards, logger);
-
-                // Perdant
-                endData.win = false;
-                endData.trophyRewards = -20;
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endData), [state.presences[loserId]!]);
-                updateWalletWithCurrency(nk, loserId, Currency.Trophies, endData.trophyRewards, logger);
+            }
+            else if (state.winner === WinnerEnum.Player1 || state.winner === WinnerEnum.Player2) {
+                PlayerActionLeave(state.winner === WinnerEnum.Player1, nk, state, logger, dispatcher, OpCodes.MATCH_END);
             }
 
             return null;
@@ -596,8 +585,9 @@ const PvPmatchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Lo
     };
 }
 
-function PlayerActionLeave(isP1: boolean, nk: nkruntime.Nakama, state: PvPBattleData, logger: nkruntime.Logger, dispatcher: nkruntime.MatchDispatcher) {
-    PvPPlayerLeave(!isP1, nk, state, logger);
+function PlayerActionLeave(p1Win: boolean, nk: nkruntime.Nakama, state: PvPBattleData, logger: nkruntime.Logger, dispatcher: nkruntime.MatchDispatcher, opCodes: OpCodes) {
+
+    PvPGetRewards(p1Win, nk, state, logger);
 
     const endDataWinner: EndStateData = {
         win: true,
@@ -609,14 +599,28 @@ function PlayerActionLeave(isP1: boolean, nk: nkruntime.Nakama, state: PvPBattle
         trophyRewards: -20,
     };
 
-    if (isP1) {
-        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataWinner), [state.presences[state.player2Id]!]);
-        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataLoser), [state.presences[state.player1Id]!]);
+    if (p1Win) {
+        const p2Presence = state.presences[state.player2Id];
+        const p1Presence = state.presences[state.player1Id];
+
+        if (p2Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataLoser), [p2Presence]);
+        }
+        if (p1Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataWinner), [p1Presence]);
+        }
+    } else {
+        const p1Presence = state.presences[state.player1Id];
+        const p2Presence = state.presences[state.player2Id];
+
+        if (p1Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataLoser), [p1Presence]);
+        }
+        if (p2Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataWinner), [p2Presence]);
+        }
     }
-    else {
-        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataWinner), [state.presences[state.player1Id]!]);
-        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataLoser), [state.presences[state.player2Id]!]);
-    }
+
 }
 
 function SendTurnState(dispatcher: nkruntime.MatchDispatcher, state: PvPBattleData, OpCodes: OpCodes) {
@@ -631,37 +635,38 @@ function SendTurnState(dispatcher: nkruntime.MatchDispatcher, state: PvPBattleDa
     dispatcher.broadcastMessage(OpCodes, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]!]);
 }
 
-function PvPPlayerLeave(p1Win: boolean, nk: nkruntime.Nakama, state: PvPBattleData, logger: nkruntime.Logger) {
+function PvPGetRewards(p1Win: boolean, nk: nkruntime.Nakama, state: PvPBattleData, logger: nkruntime.Logger) {
+    const player1Id = state.player1Id;
+    const player2Id = state.player2Id;
 
-    if (p1Win) {
-        incrementMetadataStat(nk, state.player1Id, "win", 1);
-        incrementMetadataStat(nk, state.player2Id, "loose", 1);
+    const p1Coins = countDefeatedBlasts(state.p2Blasts) * 200;
+    const p2Coins = countDefeatedBlasts(state.p1Blasts) * 200;
 
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
+    let winnerCoins = p1Win ? p1Coins : p2Coins;
+    let loserCoins = p1Win ? p2Coins : p1Coins;
 
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000, logger);
-    }
-    else {
-        incrementMetadataStat(nk, state.player2Id, "win", 1);
-        incrementMetadataStat(nk, state.player1Id, "loose", 1);
+    winnerCoins += 2000;
 
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
+    const winnerId = p1Win ? player1Id : player2Id;
+    const loserId = p1Win ? player2Id : player1Id;
 
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 1000, logger);
-    }
+    incrementMetadataStat(nk, winnerId, "win", 1);
+    incrementMetadataStat(nk, loserId, "loose", 1);
 
-    let bonusP1Ads = getMetadataStat(nk, state.player1Id, "pvpBattleButtonAds");
-    let bonusP2Ads = getMetadataStat(nk, state.player2Id, "pvpBattleButtonAds");
+    updateWalletWithCurrency(nk, winnerId, Currency.Trophies, 20, logger);
+    updateWalletWithCurrency(nk, loserId, Currency.Trophies, -20, logger);
 
-    if (bonusP1Ads) {
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 500, logger);
-        setMetadataStat(nk, state.player1Id, "pvpBattleButtonAds", false);
-    }
+    updateWalletWithCurrency(nk, winnerId, Currency.Coins, winnerCoins, logger);
+    updateWalletWithCurrency(nk, loserId, Currency.Coins, loserCoins, logger);
 
-    if (bonusP2Ads) {
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 500, logger);
-        setMetadataStat(nk, state.player2Id, "pvpBattleButtonAds", false);
-    }
+    const checkAdBonus = (playerId: string, coinReward: number) => {
+        if (getMetadataStat(nk, playerId, "pvpBattleButtonAds")) {
+            updateWalletWithCurrency(nk, playerId, Currency.Coins, coinReward / 2, logger);
+            setMetadataStat(nk, playerId, "pvpBattleButtonAds", false);
+        }
+    };
+
+    checkAdBonus(winnerId, winnerCoins);
+    checkAdBonus(loserId, loserCoins);
 }
+

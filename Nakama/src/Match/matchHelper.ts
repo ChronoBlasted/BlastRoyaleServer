@@ -443,6 +443,10 @@ function getFirstAliveBlastIndex(allPlayerBlasts: BlastEntity[]): number {
     return allPlayerBlasts.findIndex(blast => isBlastAlive(blast));
 }
 
+function countDefeatedBlasts(allPlayerBlasts: BlastEntity[]): number {
+    return allPlayerBlasts.filter(blast => !isBlastAlive(blast)).length;
+}
+
 
 function calculateManaRecovery(
     maxMana: number,

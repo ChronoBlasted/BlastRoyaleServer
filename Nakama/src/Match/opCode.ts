@@ -20,6 +20,7 @@ enum OpCodes {
     NEW_BLAST = 90,
 
     MATCH_END = 100,
+    OPPONENT_LEAVE = 101,
 
     ERROR_SERV = 404,
 

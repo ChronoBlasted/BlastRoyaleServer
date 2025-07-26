@@ -262,7 +262,15 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 if (message.opCode == OpCodes.PLAYER_LEAVE) {
                     PvEPlayerLeave(nk, state, logger);
-                    dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
+
+                    const endDataWinner: EndStateData = {
+                        win: true,
+                        trophyRewards: 0,
+                    };
+
+                    dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataWinner));
+
+                    return null;
                 }
 
             }
@@ -296,7 +304,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
 
-                        executePlayerAttack(true, state, logger, dispatcher);
+                        executePlayerAttack(true, state, logger, nk, dispatcher);
 
                     } else {
 
@@ -308,7 +316,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     break;
                 //region Player Use Item
                 case TurnType.Item:
-                    
+
                     let msgItem = {} as ItemUseJSON;
                     msgItem = state.turnStateData.p1TurnData.itemUse!;
                     msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
@@ -360,7 +368,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     } else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, dispatcher);
+                        executePlayerAttack(false, state, logger, nk, dispatcher);
                     }
                     break;
                 // region Player Change
@@ -384,7 +392,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     } else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, dispatcher);
+                        executePlayerAttack(false, state, logger, nk, dispatcher);
                     } break;
                 // region Player Wait
                 case TurnType.Wait:
@@ -395,7 +403,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     } else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, dispatcher);
+                        executePlayerAttack(false, state, logger, nk, dispatcher);
                     } break;
             }
 
@@ -522,14 +530,14 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                             addItem(nk, logger, state.player1Id, currentOffer.item!);
                             break;
                         case RewardType.Coin:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount!,logger);
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount!, logger);
 
-                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount! / 2,logger)
+                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, currentOffer.amount! / 2, logger)
                             break;
                         case RewardType.Gem:
-                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount!,logger);
+                            updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount!, logger);
 
-                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount! / 2,logger)
+                            if (getMetadataStat(nk, state.player1Id, "pveBattleButtonAds")) updateWalletWithCurrency(nk, state.player1Id, Currency.Gems, currentOffer.amount! / 2, logger)
                             break;
                         case RewardType.None:
                             break;
@@ -561,14 +569,10 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
         // region END BATTLE
         case BattleState.End:
 
-            const p1_blast = state.p1Blasts[state.p1Index]!;
-            const wildBlast = state.p2Blasts!;
 
             if (state.winner == WinnerEnum.Player1 || state.turnStateData.catched) {
 
                 state.indexProgression++;
-
-                addExpOnBlastInGame(nk, logger, state.player1Id, p1_blast, wildBlast[state.p2Index]);
 
                 if (state.turnStateData.catched) {
                     state.blastCatched++;
@@ -688,9 +692,9 @@ function PvEPlayerLeave(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkru
     if (state.indexProgression > 1) {
         let totalCoins = 200 * (state.indexProgression - 1);
 
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins,logger);
+        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins, logger);
 
-        if (bonusAds) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins / 2,logger);
+        if (bonusAds) updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, totalCoins / 2, logger);
 
         writeBestRecordLeaderboard(nk, logger, state.player1Id, LeaderboardBestStageAreaId + getMetadataStat(nk, state.player1Id, "area"), state.indexProgression - 1);
     }

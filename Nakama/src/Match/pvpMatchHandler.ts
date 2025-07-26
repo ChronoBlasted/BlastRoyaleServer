@@ -353,9 +353,9 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             if (p1.type === TurnType.Attack && p2.type === TurnType.Attack) {
                 performAttackSequence(state, dispatcher, nk, logger);
             } else if (p1.type === TurnType.Attack) {
-                executePlayerAttack(true, state, logger, dispatcher);
+                executePlayerAttack(true, state, logger,nk, dispatcher);
             } else if (p2.type === TurnType.Attack) {
-                executePlayerAttack(false, state, logger, dispatcher);
+                executePlayerAttack(false, state, logger,nk,  dispatcher);
             }
 
             if (p1.type === TurnType.Wait) {

@@ -225,7 +225,7 @@ const Cleanse: Move = {
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
-    cost: 0,
+    cost: 10,
     priority: 0,
     effects: [
         { effect: MoveEffect.Cleanse, effectModifier: 0, effectTarget: Target.Self },
@@ -238,7 +238,7 @@ const Focus: Move = {
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
-    cost: 0,
+    cost: 8,
     priority: 0,
     effects: [
         { effect: MoveEffect.AttackBoost, effectModifier: 2, effectTarget: Target.Self },

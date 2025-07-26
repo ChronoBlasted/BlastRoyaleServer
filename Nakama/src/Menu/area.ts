@@ -15,28 +15,28 @@ const thePlains: Area = {
 
 const theDarkCaves: Area = {
     id: 1,
-    trophyRequired: 200,
+    trophyRequired: 100,
     blastIds: [Balt.id, Stagpan.id, Botte.id, Booh.id, Ghoosto.id],
     blastLevels: [2, 6]
 }
 
 const theMiniHell: Area = {
     id: 2,
-    trophyRequired: 500,
+    trophyRequired: 300,
     blastIds: [Goblin.id, MiniDevil.id, DevilDare.id, Masks.id, Luckun.id, MiniHam.id, SadHam.id],
     blastLevels: [5, 9]
 }
 
 const theWildForest: Area = {
     id: 3,
-    trophyRequired: 800,
+    trophyRequired: 600,
     blastIds: [Bearos.id, Treex.id, Moutmout.id, Piggy.id, Bleaub.id, Shroom.id],
     blastLevels: [8, 12]
 }
 
 const theWideOcean: Area = {
     id: 4,
-    trophyRequired: 1100,
+    trophyRequired: 1000,
     blastIds: [Lantern.id, Droplet.id, Fireball.id, Mystical.id, Wormie.id, Smoky.id],
     blastLevels: [12, 15]
 }
@@ -72,19 +72,27 @@ const rpcLoadAllArea: nkruntime.RpcFunction =
 
 
 const rpcSelectArea: nkruntime.RpcFunction =
-    function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string) {
+    function (ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, payload: string): string {
 
         const areaID: number = JSON.parse(payload);
+        const trophies = getCurrencyInWallet(nk, ctx.userId, Currency.Trophies)
 
-        setMetadataStat(nk, ctx.userId, "area", areaID);
-
-        // TODO Check si il peut
-
-        logger.debug("user '%s' select area '%s'", ctx.userId, areaID);
+        try {
+            if (trophies >= allArea[areaID].trophyRequired) {
+                setMetadataStat(nk, ctx.userId, "area", areaID);
+                logger.debug("user '%s' select area '%s'", ctx.userId, areaID);
+                return "1";
+            } else {
+                logger.error('error selecting area: %s', areaID);
+                return "0";
+            }
+        } catch (error) {
+            throw error;
+        }
     }
 
 
-function getRandomBlastWithAreaId(userId: string, nk: nkruntime.Nakama, extraLevel: number, isBoss: boolean,logger:nkruntime.Logger): Blast {
+function getRandomBlastWithAreaId(userId: string, nk: nkruntime.Nakama, extraLevel: number, isBoss: boolean, logger: nkruntime.Logger): Blast {
 
     try {
         let areaId = clamp(getMetadataStat(nk, userId, "area"), 0, allArea.length)
@@ -139,11 +147,6 @@ function getAllAreaUnderTrophy(amountOfTrophy: number): Area[] {
     }
     return areaUnderTrophy;
 }
-
-
-
-
-
 
 function getNewBlast(nk: nkruntime.Nakama, randomBlastId: number, randomIv: number, randomData: BlastData, level: number, isBoss: boolean): Blast {
     return {

@@ -568,30 +568,23 @@ function performAttackSequence(state: BattleData, dispatcher: nkruntime.MatchDis
     state.turnStateData.p1TurnPriority = p1First;
 
     if (p1First) {
-        executePlayerAttack(true, state, logger, dispatcher);
-
-        logger.debug("P1 Attack executed");
+        executePlayerAttack(true, state, logger, nk, dispatcher);
 
         if (state.battleState === BattleState.ResolveTurn) {
-            executePlayerAttack(false, state, logger, dispatcher);
-
-            logger.debug("P2 Attack executed");
+            executePlayerAttack(false, state, logger, nk, dispatcher);
         }
     } else {
-        executePlayerAttack(false, state, logger, dispatcher);
-
-        logger.debug("P2 Attack executed");
+        executePlayerAttack(false, state, logger, nk, dispatcher);
 
         if (state.battleState === BattleState.ResolveTurn) {
-            executePlayerAttack(true, state, logger, dispatcher);
-            logger.debug("P1 Attack executed");
+            executePlayerAttack(true, state, logger, nk, dispatcher);
         }
     }
 
     return state;
 }
 
-function executePlayerAttack(isP1: boolean, state: BattleData, logger: nkruntime.Logger, dispatcher: nkruntime.MatchDispatcher): BattleData {
+function executePlayerAttack(isP1: boolean, state: BattleData, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher): BattleData {
 
     const p1Blast = state.p1Blasts[state.p1Index]!;
     const p2Blast = state.p2Blasts[state.p2Index]!;
@@ -629,18 +622,21 @@ function executePlayerAttack(isP1: boolean, state: BattleData, logger: nkruntime
         dispatcher
     }, logger);
 
+    if (isBlastAlive(defender) == false) addExpOnBlastInGame(nk, logger, isP1 ? state.player1Id : state.player2Id, attacker, defender);
+
     checkIfMatchContinue(state);
+
 
     return state;
 }
 
 function checkIfMatchContinue(state: BattleData): BattleData {
 
-    const playerBlast = state.p1Blasts[state.p1Index]!;
-    const opponentBlast = state.p2Blasts![state.p2Index];
+    const p1Blast = state.p1Blasts[state.p1Index]!;
+    const p2Blast = state.p2Blasts![state.p2Index];
 
-    const p1Alive = isBlastAlive(playerBlast);
-    const p2Alive = isBlastAlive(opponentBlast);
+    const p1Alive = isBlastAlive(p1Blast);
+    const p2Alive = isBlastAlive(p2Blast);
 
     const allP1Dead = isAllBlastDead(state.p1Blasts);
     const allP2Dead = isAllBlastDead(state.p2Blasts!);

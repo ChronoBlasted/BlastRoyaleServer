@@ -125,42 +125,27 @@ const PvPmatchLeave = function (
     presences: nkruntime.Presence[]
 ): { state: PvPBattleData } | null {
 
-    if (ConnectedPlayers(state) > 1) {
-        for (let presence of presences) {
-            logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
-
-            const isP1 = presence.userId === state.player1Id;
-            const opponentId = isP1 ? state.player2Id : state.player1Id;
-            const opponentPresence = state.presences[opponentId];
-
-            PvPPlayerLeave(!isP1, nk, state, logger);
-
-            let endData: EndStateData = {
-                win :true,
-                trophyRewards:20,
-            }
-
-            if (opponentPresence) {
-                dispatcher.broadcastMessage(OpCodes.OPPONENT_LEAVE, JSON.stringify(endData), [opponentPresence]);
-            }
-
-            state.presences[presence.userId] = null;
-        }
-
-        for (let userID in state.presences) {
-            if (state.presences[userID] === null) {
-                delete state.presences[userID];
-            }
-        }
-
-    } else {
-        logger.info("Last player left, match will be closed.");
-        return null;
+    for (let presence of presences) {
+        logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
     }
+
+    for (let presence of presences) {
+        state.presences[presence.userId] = null;
+    }
+
+
+    for (let userID in state.presences) {
+        if (state.presences[userID] === null) {
+            delete state.presences[userID];
+        }
+    }
+
+    if (ConnectedPlayers(state) == 0 || ConnectedPlayers(state) == 1) return null;
 
     logger.info("Player connected amount : %s", ConnectedPlayers(state));
     return { state };
 };
+
 
 
 
@@ -278,19 +263,26 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 const parsed = JSON.parse(nk.binaryToString(message.data));
 
                 const action: PlayerActionData = {
-                    type: parsed.type,
+                    type: parseEnum(parsed.type.toString(), TurnType),
                     data: parsed.data ?? 0,
                 };
 
+                if (action.type == TurnType.Leave) {
+                    PlayerActionLeave(userId === state.player1Id, nk, state, logger, dispatcher);
+                    return null;
+                }
+
                 if (userId === state.player1Id) {
-                    state.turnStateData.p1TurnData.type = parseEnum(action.type.toString(), TurnType);
+                    state.turnStateData.p1TurnData.type = action.type;
                     state.turnStateData.p1TurnData.index = action.data;
                 }
 
                 if (userId === state.player2Id) {
-                    state.turnStateData.p2TurnData.type = parseEnum(action.type.toString(), TurnType);
+                    state.turnStateData.p2TurnData.type = action.type;
                     state.turnStateData.p2TurnData.index = action.data;
                 }
+
+
             }
 
             if (!state.turnTimer) {
@@ -602,6 +594,29 @@ const PvPmatchTerminate = function (ctx: nkruntime.Context, logger: nkruntime.Lo
     return {
         state
     };
+}
+
+function PlayerActionLeave(isP1: boolean, nk: nkruntime.Nakama, state: PvPBattleData, logger: nkruntime.Logger, dispatcher: nkruntime.MatchDispatcher) {
+    PvPPlayerLeave(!isP1, nk, state, logger);
+
+    const endDataWinner: EndStateData = {
+        win: true,
+        trophyRewards: 20,
+    };
+
+    const endDataLoser: EndStateData = {
+        win: false,
+        trophyRewards: -20,
+    };
+
+    if (isP1) {
+        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataWinner), [state.presences[state.player2Id]!]);
+        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataLoser), [state.presences[state.player1Id]!]);
+    }
+    else {
+        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataWinner), [state.presences[state.player1Id]!]);
+        dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataLoser), [state.presences[state.player2Id]!]);
+    }
 }
 
 function SendTurnState(dispatcher: nkruntime.MatchDispatcher, state: PvPBattleData, OpCodes: OpCodes) {

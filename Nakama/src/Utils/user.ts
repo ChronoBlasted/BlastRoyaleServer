@@ -37,7 +37,7 @@ const DefaultMetadata: PlayerMetadata = {
 function afterAuthenticate(ctx: nkruntime.Context, logger: nkruntime.Logger, nk: nkruntime.Nakama, data: nkruntime.Session) {
 
     createDailyQuestStorageIfNeeded(ctx.userId, nk, logger);
-    incrementQuest(ctx.userId, QuestIds.LOGIN, 1, nk, logger);
+    incrementQuest(ctx.userId, QuestType.Login, 1, nk, logger);
 
     if (!data.created) {
         logger.info('User with id: %s account data already existing', ctx.userId);

@@ -303,20 +303,20 @@ function applyEffect(blast: BlastEntity, move: Move, effectData: MoveEffectData)
             break;
 
         case MoveEffect.ManaExplosion:
-            const manaDmg = Math.floor(blast.maxMana / 2);
+            const manaDmg = Math.floor(getMaxMana(blast) / 2);
             blast.hp = Math.max(0, blast.hp - manaDmg);
             blast.mana = Math.floor(blast.mana / 2);
             break;
         case MoveEffect.HpExplosion:
-            const hpCost = Math.floor(blast.maxHp / 3);
+            const hpCost = Math.floor(getMaxHp(blast) / 3);
             blast.hp = Math.max(0, blast.hp - hpCost);
             break;
 
         case MoveEffect.ManaRestore:
-            blast.mana = Math.min(blast.maxMana, blast.mana + move.power);
+            blast.mana = Math.min(getMaxMana(blast), blast.mana + move.power);
             break;
         case MoveEffect.HpRestore:
-            blast.hp = Math.min(blast.maxHp, blast.hp + move.power);
+            blast.hp = Math.min(getMaxHp(blast), blast.hp + move.power);
             break;
 
         case MoveEffect.AttackBoost:
@@ -366,33 +366,37 @@ function getStatModifier(stat: Stats, modifiers: modifierBlastStruct[]): number 
 }
 
 function updateStatModifier(mods: modifierBlastStruct[], stat: Stats, delta: number): modifierBlastStruct[] {
-
     const index = mods.findIndex((m) => m.stats === stat);
 
     if (index >= 0) {
         mods[index].amount += delta;
-        if (mods[index].amount <= 0) mods.splice(index, 1);
-    } else if (delta > 0) {
+
+        if (mods[index].amount === 0) {
+            mods.splice(index, 1);
+        }
+    } else {
         mods.push({ stats: stat, amount: delta });
     }
+
     return mods;
 }
+
 
 function applyStatusEffectAtEndOfTurn(blast: BlastEntity, otherBlast: BlastEntity): { blast: BlastEntity, otherBlast: BlastEntity } {
     switch (blast.status) {
         case Status.Burn:
-            blast.hp = Math.max(0, blast.hp - Math.floor(blast.maxHp / 16));
+            blast.hp = Math.max(0, blast.hp - Math.floor(getMaxHp(blast) / 16));
             break;
 
         case Status.Seeded:
-            const healAmount = Math.floor(blast.maxHp / 16);
+            const healAmount = Math.floor(getMaxHp(blast) / 16);
 
             blast.hp = Math.max(0, blast.hp - healAmount);
-            otherBlast.hp = Math.min(otherBlast.maxHp, otherBlast.hp + healAmount);
+            otherBlast.hp = Math.min(getMaxHp(otherBlast), otherBlast.hp + healAmount);
             break;
 
         case Status.Wet:
-            blast.mana = Math.max(0, blast.mana - Math.floor(blast.maxMana / 32));
+            blast.mana = Math.max(0, blast.mana - Math.floor(getMaxMana(blast) / 32));
             break;
         default:
             break;
@@ -468,7 +472,7 @@ function calculateManaRecovery(
 function healHealthBlast(blast: BlastEntity, amount: number): BlastEntity {
     blast.hp += amount;
 
-    if (blast.hp > blast.maxHp) blast.hp = blast.maxHp;
+    if (blast.hp > getMaxHp(blast)) blast.hp = getMaxHp(blast);
 
     return blast;
 }
@@ -476,7 +480,7 @@ function healHealthBlast(blast: BlastEntity, amount: number): BlastEntity {
 function healManaBlast(blast: BlastEntity, amount: number): BlastEntity {
     blast.mana += amount;
 
-    if (blast.mana > blast.maxMana) blast.mana = blast.maxMana;
+    if (blast.mana > getMaxMana(blast)) blast.mana = getMaxMana(blast);
 
     return blast;
 }
@@ -491,10 +495,10 @@ function healStatusBlast(blast: BlastEntity, status: Status): BlastEntity {
 
 
 function getFasterBlast(blast1: BlastEntity, blast2: BlastEntity): boolean {
-    if (blast1.speed === blast2.speed) {
+    if (getSpeed(blast1) === getSpeed(blast2)) {
         return Math.random() < 0.5;
     } else {
-        return blast1.speed > blast2.speed;
+        return getSpeed(blast1) > getSpeed(blast2);
     }
 }
 
@@ -588,6 +592,20 @@ function performAttackSequence(state: BattleData, dispatcher: nkruntime.MatchDis
     return state;
 }
 
+interface AttackContext {
+    move: Move;
+    attacker: BlastEntity;
+    defender: BlastEntity;
+    attackerPlatforms: Type[];
+    setAttacker: (b: BlastEntity) => void;
+    setDefender: (b: BlastEntity) => void;
+    getTurnData: () => PlayerTurnData;
+    setMoveDamage: (dmg: number) => void;
+    setMoveEffect: (effects: MoveEffectData[]) => void;
+    meteo: Meteo;
+    dispatcher: nkruntime.MatchDispatcher;
+}
+
 function executePlayerAttack(isP1: boolean, state: BattleData, logger: nkruntime.Logger, nk: nkruntime.Nakama, dispatcher: nkruntime.MatchDispatcher): BattleData {
 
     const p1Blast = state.p1Blasts[state.p1Index]!;
@@ -633,6 +651,131 @@ function executePlayerAttack(isP1: boolean, state: BattleData, logger: nkruntime
 
     return state;
 }
+
+function ExecuteAttack(ctx: AttackContext, logger: nkruntime.Logger): void {
+    // Gestion mana/plateforme
+    switch (ctx.move.attackType) {
+        case AttackType.Normal:
+        case AttackType.Status:
+            if (ctx.attacker.mana < ctx.move.cost) return;
+            ctx.attacker.mana = clamp(ctx.attacker.mana - ctx.move.cost, 0, Number.POSITIVE_INFINITY);
+            ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
+            if (calculateWeatherModifier(ctx.meteo, ctx.move.type) > 1) {
+                ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
+            }
+            break;
+        case AttackType.Special: {
+            const platformCount = getAmountOfPlatformTypeByType(ctx.attackerPlatforms, ctx.move.type);
+            if (platformCount < ctx.move.cost) return;
+            ctx.attackerPlatforms = removePlatformTypeByType(ctx.attackerPlatforms, ctx.move.type, ctx.move.cost);
+            break;
+        }
+    }
+
+    // Application des effets
+    const effects = ApplyMoveEffects(
+        ctx.move,
+        () => ctx.defender,
+        ctx.setDefender,
+        () => ctx.attacker,
+        ctx.setAttacker
+    );
+    ctx.setMoveEffect(effects);
+
+    let damage = 0;
+
+    // Application des dégâts
+    if (ctx.move.target === Target.Opponent) {
+        damage = ApplyBlastAttack(
+            ctx.attacker,
+            ctx.defender,
+            ctx.move,
+            ctx.meteo,
+            logger
+        );
+        ctx.setMoveDamage(damage);
+    }
+
+    return;
+}
+
+function ApplyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Move, meteo: Meteo, logger: nkruntime.Logger): number {
+
+    const attackerBaseAttack = getAttack(attacker);
+    const attackerAttackModifier = getStatModifier(Stats.Attack, attacker.modifiers);
+    const attackerAttack = attackerBaseAttack * attackerAttackModifier;
+    logger.debug(`Attacker attack modifier: ${attackerAttackModifier}`);
+    logger.debug(`Final attacker attack: ${attackerAttack}`);
+
+    const defenderBaseDefense = getDefense(defender);
+    const defenderDefenseModifier = getStatModifier(Stats.Defense, defender.modifiers);
+    const defenderDefense = defenderBaseDefense * defenderDefenseModifier;
+
+    const moveType = move.type;
+    logger.debug(`Move type: ${moveType}`);
+
+    const defenderType = getBlastDataById(defender.data_id!).type;
+    const movePower = move.power;
+    const attackerLevel = getLevel(attacker);
+
+    const damage = calculateDamage(
+        attackerLevel,
+        attackerAttack,
+        defenderDefense,
+        moveType,
+        defenderType,
+        movePower,
+        meteo,
+        logger
+    );
+
+    logger.debug(`Calculated damage: ${damage}`);
+
+    defender.hp = clamp(defender.hp - damage, 0, Number.POSITIVE_INFINITY);
+
+    return damage;
+
+}
+
+function ApplyMoveEffects(
+    move: Move,
+    getTargetBlast: () => BlastEntity,
+    setTargetBlast: (blast: BlastEntity) => void,
+    getAttacker: () => BlastEntity,
+    setAttacker: (blast: BlastEntity) => void
+): MoveEffectData[] {
+    if (!move.effects || move.effects.length === 0) return [];
+
+    const effectsThisTurn: MoveEffectData[] = [];
+
+    for (const effectData of move.effects) {
+        if (effectData.effect === MoveEffect.None) continue;
+
+        let getTarget: () => BlastEntity;
+        let setTarget: (b: BlastEntity) => void;
+
+        if (effectData.effectTarget === Target.Self) {
+            getTarget = getAttacker;
+            setTarget = setAttacker;
+        } else {
+            getTarget = getTargetBlast;
+            setTarget = setTargetBlast;
+        }
+
+        if (move.attackType === AttackType.Special || move.attackType === AttackType.Status) {
+            const updated = applyEffect(getTarget(), move, effectData);
+            setTarget(updated);
+            effectsThisTurn.push(effectData);
+        } else {
+            const result = calculateEffectWithProbability(getTarget(), move, effectData);
+            setTarget(result.blast);
+            effectsThisTurn.push(result.moveEffect);
+        }
+    }
+
+    return effectsThisTurn;
+}
+
 
 function checkIfMatchContinue(state: BattleData): BattleData {
 
@@ -692,7 +835,8 @@ function trySwapBlast(
 // #region Others
 
 function addExpOnBlastInGame(nk: nkruntime.Nakama, logger: nkruntime.Logger, playerId: string, currentPlayerBlast: Blast, enemyBlast: Blast) {
-    let expToAdd = calculateExperienceGain(getBlastDataById(currentPlayerBlast.data_id).expYield, calculateLevelFromExperience(enemyBlast.exp), calculateLevelFromExperience(currentPlayerBlast.exp));
+    let expToAdd = calculateExperienceGain(getBlastDataById(enemyBlast.data_id).expYield, calculateLevelFromExperience(currentPlayerBlast.exp), calculateLevelFromExperience(enemyBlast.exp));
+    currentPlayerBlast.exp += expToAdd;
     addExpOnBlast(nk, logger, playerId, currentPlayerBlast.uuid, expToAdd);
 }
 
@@ -725,6 +869,26 @@ function isShiny(probability: number = 1 / 1024): boolean {
 
 function EndLoopDebug(logger: nkruntime.Logger, state: BattleData) {
     logger.debug('______________ END LOOP BATTLE ______________');
-    logger.debug('Wild blast HP : %h, Mana : %m', state.p2Blasts?.[state.p2Index].hp, state.p2Blasts?.[state.p2Index].mana);
-    logger.debug('Player blast HP : %h, Mana : %m', state.p1Blasts[state.p1Index]?.hp, state.p1Blasts[state.p1Index]?.mana);
+
+    logger.debug('Player blast HP : %h, Mana : %m, Exp : %e,Level : %l', state.p1Blasts?.[state.p1Index].hp, state.p1Blasts?.[state.p1Index].mana, getRatioExp(state.p1Blasts?.[state.p1Index]), getLevel(state.p1Blasts?.[state.p1Index]));
+    logger.debug('Opponent blast HP : %h, Mana : %m, Exp : %e,Level : %l', state.p2Blasts?.[state.p2Index].hp, state.p2Blasts?.[state.p2Index].mana, getRatioExp(state.p2Blasts?.[state.p2Index]), getLevel(state.p2Blasts?.[state.p2Index]));
+}
+
+function ConnectedPlayers(s: BattleData): number {
+    let count = 0;
+    for (const p of Object.keys(s.presences)) {
+        if (s.presences[p] !== null) {
+            count++;
+        }
+    }
+    return count;
+}
+
+function ErrorFunc(state: BattleData, error: string, dispatcher: nkruntime.MatchDispatcher, currentBattleState: BattleState) {
+    state.battleState = currentBattleState;
+    state.player1State = PlayerState.Ready;
+
+    dispatcher.broadcastMessage(OpCodes.ERROR_SERV, JSON.stringify(error));
+
+    return { state };
 }

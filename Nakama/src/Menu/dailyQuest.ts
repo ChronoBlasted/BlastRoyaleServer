@@ -3,50 +3,60 @@ const DailyQuestPermissionWrite = 0;
 const DailyQuestCollectionName = "daily_quests";
 const DailyQuestStorageKey = "daily_quests_key";
 
-enum QuestIds {
-  LOGIN = "login",
-  DEFEAT_BLAST = "defeat_blast",
-  CATCH_BLAST = "catch_blast",
-  WATCH_AD = "watch_ad",
+enum QuestType {
+  Login,
+  DefeatBlast,
+  CatchBlast,
+  WatchAd,
 }
 
-const QuestDefinitions = {
-  [QuestIds.LOGIN]: { goal: 1 } as QuestDefinition,
-  [QuestIds.DEFEAT_BLAST]: { goal: 5 } as QuestDefinition,
-  [QuestIds.CATCH_BLAST]: { goal: 2 } as QuestDefinition,
-  [QuestIds.WATCH_AD]: { goal: 1 } as QuestDefinition,
-};
+const DefaultQuest: QuestData[] = [
 
-type QuestDefinitionsType = {
-  [key in QuestIds]: QuestDefinition;
-};
+  {
+    questType: QuestType.Login,
+    goal: 1,
+  },
+  {
+    questType: QuestType.DefeatBlast,
+    goal: 5,
+  },
+  {
+    questType: QuestType.CatchBlast,
+    goal: 2,
+  },
+  {
+    questType: QuestType.WatchAd,
+    goal: 1,
+  },
+]
 
-type QuestDefinition = {
+type QuestData = {
+  questType: QuestType
   goal: number;
 };
 
 
 interface DailyQuest {
-  id: string;
+  type: QuestType;
   goal: number;
   progress: number;
 }
 
-interface DailyQuestData {
+interface AllQuestData {
   quests: DailyQuest[];
   lastReset: number;
   rewardCount: number;
 }
 
-function generateDailyQuests(): DailyQuestData {
+function generateDailyQuests(): AllQuestData {
   return {
-    quests: Object.entries(QuestDefinitions).map(([id, def]) => ({
-      id: id,
+    quests: DefaultQuest.map((def): DailyQuest => ({
+      type: def.questType,
       goal: def.goal,
       progress: 0,
-    })) as DailyQuest[],
+    })),
     lastReset: Date.now(),
-    rewardCount: 0
+    rewardCount: 0,
   };
 }
 
@@ -86,9 +96,9 @@ function rpcGetDailyQuests(context: nkruntime.Context, logger: nkruntime.Logger,
     userId
   }]);
 
-  let dailyData: DailyQuestData;
+  let dailyData: AllQuestData;
 
-  dailyData = records[0].value as DailyQuestData;
+  dailyData = records[0].value as AllQuestData;
 
   if (isDailyResetDue(dailyData.lastReset)) {
     dailyData = generateDailyQuests();
@@ -109,7 +119,7 @@ function rpcGetDailyQuests(context: nkruntime.Context, logger: nkruntime.Logger,
   return result;
 }
 
-function incrementQuest(userId: string, questId: string, amount: number, nk: nkruntime.Nakama, logger: nkruntime.Logger) {
+function incrementQuest(userId: string, questType: QuestType, amount: number, nk: nkruntime.Nakama, logger: nkruntime.Logger) {
   const records = nk.storageRead([{
     collection: DailyQuestCollectionName,
     key: DailyQuestStorageKey,
@@ -122,18 +132,18 @@ function incrementQuest(userId: string, questId: string, amount: number, nk: nkr
   }
 
   const record = records[0];
-  const data = record.value as DailyQuestData;
+  const data = record.value as AllQuestData;
   const version = record.version;
 
-  const quest = data.quests.find((q: DailyQuest) => q.id === questId);
+  const quest = data.quests.find((q: DailyQuest) => q.type === questType);
   if (!quest) {
-    logger.debug(`incrementQuest: Quest with id=${questId} not found for userId=${userId}`);
+    logger.debug(`incrementQuest: Quest with type=${questType} not found for userId=${userId}`);
     return;
   }
 
   const oldProgress = quest.progress;
   quest.progress = Math.min(quest.goal, quest.progress + amount);
-  logger.debug(`incrementQuest: Updated quest '${questId}' for userId=${userId} from progress=${oldProgress} to progress=${quest.progress} (goal=${quest.goal})`);
+  logger.debug(`incrementQuest: Updated quest '${questType}' for userId=${userId} from progress=${oldProgress} to progress=${quest.progress} (goal=${quest.goal})`);
 
   const writeRequest: nkruntime.StorageWriteRequest = {
     collection: DailyQuestCollectionName,
@@ -159,7 +169,7 @@ function rpcClaimDailyQuestReward(context: nkruntime.Context, logger: nkruntime.
   const records = nk.storageRead([{ collection: DailyQuestCollectionName, key: DailyQuestStorageKey, userId: context.userId }]);
   if (!records.length) throw new Error("No daily quests foundddd");
 
-  const data = records[0].value as DailyQuestData;
+  const data = records[0].value as AllQuestData;
   const version = records[0].version;
 
   const finishedCount = data.quests.filter(q => q.progress >= q.goal).length;
@@ -210,7 +220,7 @@ function rpcGetDailyQuestRewards(context: nkruntime.Context, logger: nkruntime.L
 
   if (!records.length) throw new Error("No daily quest record found for userId=" + userId);
 
-  const data = records[0].value as DailyQuestData;
+  const data = records[0].value as AllQuestData;
 
   const response = {
     rewards: rewardList,
@@ -223,9 +233,9 @@ function rpcGetDailyQuestRewards(context: nkruntime.Context, logger: nkruntime.L
 
 
 const rewardList: Reward[] = [
-    { type:RewardType.Gem, amount: 2 },
-    { type:RewardType.Coin, amount: 2000 },
-    { type:RewardType.Coin, amount: 5000 },
-    { type:RewardType.Gem, amount: 5 },
+  { type: RewardType.Gem, amount: 2 },
+  { type: RewardType.Coin, amount: 2000 },
+  { type: RewardType.Coin, amount: 5000 },
+  { type: RewardType.Gem, amount: 5 },
 ];
 

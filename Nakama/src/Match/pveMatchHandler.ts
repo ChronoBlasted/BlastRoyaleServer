@@ -88,7 +88,7 @@ const PvEinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
     return {
         state: PvEBattleData,
-        tickRate: 2, // 1 tick per second = 1 MatchLoop func invocations per second
+        tickRate: 5, // 1 tick per second = 1 MatchLoop func invocations per second
         label: ''
     };
 };
@@ -221,11 +221,22 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     moveEffects: [],
                 }
 
-                state.turnStateData.p2TurnData = {
-                    type: TurnType.None,
-                    index: getRandomUsableMove(getMovesByIds(state.p2Blasts![state.p2Index].activeMoveset!), state.p2Blasts![state.p2Index].mana, state.player2Platform),
-                    moveDamage: 0,
-                    moveEffects: [],
+                let p2Index = getRandomUsableMove(getMovesByIds(state.p2Blasts![state.p2Index].activeMoveset!), state.p2Blasts![state.p2Index].mana, state.player2Platform);
+
+                if (p2Index == -1) {
+                    state.turnStateData.p2TurnData = {
+                        type: TurnType.Wait,
+                        index: 0,
+                        moveDamage: 0,
+                        moveEffects: [],
+                    }
+                } else {
+                    state.turnStateData.p2TurnData = {
+                        type: TurnType.Attack,
+                        index: p2Index,
+                        moveDamage: 0,
+                        moveEffects: [],
+                    }
                 }
 
                 state.turnStateData.catched = false;
@@ -287,27 +298,31 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
 
         case BattleState.ResolveTurn:
-
             switch (state.turnStateData.p1TurnData.type) {
                 // region Attack
                 case TurnType.Attack:
                     state.turnStateData.p1TurnData.index = clamp(state.turnStateData.p1TurnData.index, 0, 3);
-                    let move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![state.turnStateData.p1TurnData.index]);
+                    let p1Move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![state.turnStateData.p1TurnData.index]);
+                    let p2Move = getMoveById(state.p2Blasts[state.p2Index]!.activeMoveset![state.turnStateData.p2TurnData.index]);
 
-                    if (move == null) {
+                    if (p1Move == null) {
                         ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready);
+                        break;
+                    }
+
+                    if (p2Move == null && state.turnStateData.p2TurnData.type == TurnType.Attack) {
+                        ErrorFunc(state, "Player 2 move null", dispatcher, BattleState.Ready);
                         break;
                     }
 
                     let moveIndex = state.turnStateData.p2TurnData.index;
                     if (moveIndex === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
 
                         executePlayerAttack(true, state, logger, nk, dispatcher);
 
                     } else {
-
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
 
                         performAttackSequence(state, dispatcher, nk, logger);
@@ -349,7 +364,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         case ITEM_BEHAVIOUR.Catch:
                             var wildBlastCaptured = false;
 
-                            wildBlastCaptured = isBlastCaptured(state.p2Blasts![state.p2Index].hp, state.p2Blasts![state.p2Index].maxHp, getBlastDataById(state.p2Blasts![state.p2Index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
+                            wildBlastCaptured = isBlastCaptured(state.p2Blasts![state.p2Index].hp, getMaxHp(state.p2Blasts![state.p2Index]), getBlastDataById(state.p2Blasts![state.p2Index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
 
                             if (wildBlastCaptured) {
                                 logger.debug('Wild blast Captured !', wildBlastCaptured);
@@ -364,7 +379,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     }
 
                     if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     } else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
@@ -388,7 +403,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     state.p1Index = msgChangeBlast;
 
                     if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     } else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
@@ -396,10 +411,10 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                     } break;
                 // region Player Wait
                 case TurnType.Wait:
-                    state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, true);
+                    state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, true);
 
                     if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, true);
+                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     } else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
@@ -414,8 +429,8 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
             checkIfMatchContinue(state);
 
-            if (isBlastAlive(state.p2Blasts![state.p2Index])) state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
-            if (isBlastAlive(state.p1Blasts[state.p1Index]!)) state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
+            if (isBlastAlive(state.p1Blasts[state.p1Index]!)) state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, false);
+            if (isBlastAlive(state.p2Blasts![state.p2Index])) state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, false);
 
             if (state.battleState == BattleState.End) {
                 dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
@@ -577,14 +592,14 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 if (state.turnStateData.catched) {
                     state.blastCatched++;
 
-                    incrementQuest(state.player1Id, QuestIds.CATCH_BLAST, 1, nk, logger);
+                    incrementQuest(state.player1Id, QuestType.CatchBlast, 1, nk, logger);
 
                     addBlast(nk, logger, state.player1Id, state.p2Blasts![state.p2Index]);
                 }
                 else {
                     state.blastDefeated++;
 
-                    incrementQuest(state.player1Id, QuestIds.DEFEAT_BLAST, 1, nk, logger);
+                    incrementQuest(state.player1Id, QuestType.DefeatBlast, 1, nk, logger);
                 }
 
                 if (state.indexProgression % 5 == 0 && state.indexProgression % 10 != 0) {
@@ -709,145 +724,7 @@ function GetNewWildBlast(state: PvEBattleData, nk: nkruntime.Nakama, logger: nkr
 }
 
 
-function ErrorFunc(state: BattleData, error: string, dispatcher: nkruntime.MatchDispatcher, currentBattleState: BattleState) {
-    state.battleState = currentBattleState;
-    state.player1State = PlayerState.Ready;
 
-    dispatcher.broadcastMessage(OpCodes.ERROR_SERV, JSON.stringify(error));
-
-    return { state };
-}
-
-function ConnectedPlayers(s: BattleData): number {
-    let count = 0;
-    for (const p of Object.keys(s.presences)) {
-        if (s.presences[p] !== null) {
-            count++;
-        }
-    }
-    return count;
-}
-
-//#region  Attack Logic
-function ApplyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Move, meteo: Meteo, logger: nkruntime.Logger): number {
-    let damage = calculateDamage(
-        calculateLevelFromExperience(attacker.exp),
-        attacker.attack * getStatModifier(Stats.Attack, attacker.modifiers),
-        defender.defense * getStatModifier(Stats.Defense, defender.modifiers),
-        move.type,
-        getBlastDataById(defender.data_id!).type,
-        move.power,
-        meteo,
-        logger
-    );
-
-    defender.hp = clamp(defender.hp - damage, 0, Number.POSITIVE_INFINITY);
-
-    return damage;
-}
-
-interface AttackContext {
-    move: Move;
-    attacker: BlastEntity;
-    defender: BlastEntity;
-    attackerPlatforms: Type[];
-    setAttacker: (b: BlastEntity) => void;
-    setDefender: (b: BlastEntity) => void;
-    getTurnData: () => PlayerTurnData;
-    setMoveDamage: (dmg: number) => void;
-    setMoveEffect: (effects: MoveEffectData[]) => void;
-    meteo: Meteo;
-    dispatcher: nkruntime.MatchDispatcher;
-}
-
-function ExecuteAttack(ctx: AttackContext, logger: nkruntime.Logger): void {
-    // Gestion mana/plateforme
-    switch (ctx.move.attackType) {
-        case AttackType.Normal:
-        case AttackType.Status:
-            if (ctx.attacker.mana < ctx.move.cost) return;
-            ctx.attacker.mana = clamp(ctx.attacker.mana - ctx.move.cost, 0, Number.POSITIVE_INFINITY);
-            ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
-            if (calculateWeatherModifier(ctx.meteo, ctx.move.type) > 1) {
-                ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
-            }
-            break;
-        case AttackType.Special: {
-            const platformCount = getAmountOfPlatformTypeByType(ctx.attackerPlatforms, ctx.move.type);
-            if (platformCount < ctx.move.cost) return;
-            ctx.attackerPlatforms = removePlatformTypeByType(ctx.attackerPlatforms, ctx.move.type, ctx.move.cost);
-            break;
-        }
-    }
-
-    // Application des effets
-    const effects = ApplyMoveEffects(
-        ctx.move,
-        () => ctx.defender,
-        ctx.setDefender,
-        () => ctx.attacker,
-        ctx.setAttacker
-    );
-    ctx.setMoveEffect(effects);
-
-    let damage = 0;
-
-    // Application des dégâts
-    if (ctx.move.target === Target.Opponent) {
-        damage = ApplyBlastAttack(
-            ctx.attacker,
-            ctx.defender,
-            ctx.move,
-            ctx.meteo,
-            logger
-        );
-        ctx.setMoveDamage(damage);
-    }
-
-    return;
-}
-
-function ApplyMoveEffects(
-    move: Move,
-    getTargetBlast: () => BlastEntity,
-    setTargetBlast: (blast: BlastEntity) => void,
-    getAttacker: () => BlastEntity,
-    setAttacker: (blast: BlastEntity) => void
-): MoveEffectData[] {
-    if (!move.effects || move.effects.length === 0) return [];
-
-    const effectsThisTurn: MoveEffectData[] = [];
-
-    for (const effectData of move.effects) {
-        if (effectData.effect === MoveEffect.None) continue;
-
-        let getTarget: () => BlastEntity;
-        let setTarget: (b: BlastEntity) => void;
-
-        if (effectData.effectTarget === Target.Self) {
-            getTarget = getAttacker;
-            setTarget = setAttacker;
-        } else {
-            getTarget = getTargetBlast;
-            setTarget = setTargetBlast;
-        }
-
-        if (move.attackType === AttackType.Special || move.attackType === AttackType.Status) {
-            const updated = applyEffect(getTarget(), move, effectData);
-            setTarget(updated);
-            effectsThisTurn.push(effectData);
-        } else {
-            const result = calculateEffectWithProbability(getTarget(), move, effectData);
-            setTarget(result.blast);
-            effectsThisTurn.push(result.moveEffect);
-        }
-    }
-
-    return effectsThisTurn;
-}
-
-
-//#endregion
 
 // region Offer Turn Logic
 function getRandomReward(nk: nkruntime.Nakama, state: PvEBattleData, logger: nkruntime.Logger): Reward {

@@ -1,17 +1,14 @@
 {
   "files": [
     "src/main.ts",
-    
     "src/Utils/ads.ts",
     "src/Utils/user.ts",
     "src/Utils/tests.ts",
     "src/Utils/logic.ts",
     "src/Utils/economy.ts",
-
     "src/Data/movepedie.ts",
     "src/Data/itempedie.ts",
     "src/Data/blastpedie.ts",
-
     "src/Menu/bag.ts",
     "src/Menu/area.ts",
     "src/Menu/squad.ts",
@@ -21,11 +18,10 @@
     "src/Menu/dailyReward.ts",
     "src/Menu/leaderboard.ts",
     "src/Menu/blastTracker.ts",
-    
     "src/Match/opCode.ts",
-    "src/Match/matchHelper.ts",
     "src/Match/pveMatchHandler.ts",
     "src/Match/pvpMatchHandler.ts",
+    "src/Match/matchHelper.ts",
   ],
   "compilerOptions": {
     "target": "ES2017", /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */

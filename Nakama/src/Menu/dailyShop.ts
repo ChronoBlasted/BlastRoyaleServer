@@ -139,12 +139,12 @@ function rpcBuyDailyShopOffer(context: nkruntime.Context, logger: nkruntime.Logg
         throw error;
     }
 
-    if (dailyShop.lastDailyShop[indexOffer].offer.blast != null) {
-        addBlast(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].offer.blast!)
+    if (dailyShop.lastDailyShop[indexOffer].reward.blast != null) {
+        addBlast(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].reward.blast!)
     }
 
-    if (dailyShop.lastDailyShop[indexOffer].offer.item != null) {
-        addItem(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].offer.item!)
+    if (dailyShop.lastDailyShop[indexOffer].reward.item != null) {
+        addItem(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].reward.item!)
     }
 
     var result = JSON.stringify(dailyShop);
@@ -178,7 +178,7 @@ function getRandomStoreOffer(nk: nkruntime.Nakama, userId: string, logger: nkrun
 
     let storeOffer: StoreOffer = {
         offer_id: -1,
-        offer: {
+        reward: {
             type: RewardType.None,
         },
         price: 0,
@@ -187,15 +187,15 @@ function getRandomStoreOffer(nk: nkruntime.Nakama, userId: string, logger: nkrun
     };
 
     if (Math.random() < 0.5) {
-        storeOffer.offer.type = RewardType.Blast;
-        storeOffer.offer.blast = getRandomBlastEntityInAllPlayerArea(userId, nk, false);
-        storeOffer.price = getBlastPrice(storeOffer.offer.blast);
+        storeOffer.reward.type = RewardType.Blast;
+        storeOffer.reward.blast = getRandomBlastEntityInAllPlayerArea(userId, nk, false);
+        storeOffer.price = getBlastPrice(storeOffer.reward.blast);
         storeOffer.currency = Currency.Coins;
     } else {
-        storeOffer.offer.type = RewardType.Item;
-        storeOffer.offer.item = getRandomItem(1 + Math.floor(Math.random() * 10));
+        storeOffer.reward.type = RewardType.Item;
+        storeOffer.reward.item = getRandomItem(1 + Math.floor(Math.random() * 10));
 
-        storeOffer.price = getItemPrice(storeOffer.offer.item) * storeOffer.offer.item.amount;
+        storeOffer.price = getItemPrice(storeOffer.reward.item) * storeOffer.reward.item.amount;
         storeOffer.currency = Currency.Coins;
     }
 

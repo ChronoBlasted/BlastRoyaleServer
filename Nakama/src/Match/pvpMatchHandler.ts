@@ -76,7 +76,7 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
     return {
         state: PvPBattleData,
-        tickRate: 2, // 1 tick per second = 1 MatchLoop func invocations per second
+        tickRate: 10, // 1 tick per second = 1 MatchLoop func invocations per second
         label: ''
     };
 };
@@ -360,11 +360,11 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             }
 
             if (p1.type === TurnType.Wait) {
-                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, true);
+                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, true);
             }
 
             if (p2.type === TurnType.Wait) {
-                state.p2Blasts[state.p2Index]!.mana = calculateManaRecovery(state.p2Blasts[state.p2Index]!.maxMana, state.p2Blasts[state.p2Index]!.mana, true);
+                state.p2Blasts[state.p2Index]!.mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts[state.p2Index]!.mana, true);
             }
 
             ({ blast: state.p1Blasts[state.p1Index]!, otherBlast: state.p2Blasts![state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index]!, state.p2Blasts![state.p2Index]));
@@ -373,11 +373,11 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             checkIfMatchContinue(state);
 
             if (isBlastAlive(state.p2Blasts![state.p2Index])) {
-                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(state.p2Blasts![state.p2Index].maxMana, state.p2Blasts![state.p2Index].mana, false);
+                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, false);
             }
 
             if (isBlastAlive(state.p1Blasts[state.p1Index]!)) {
-                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(state.p1Blasts[state.p1Index]!.maxMana, state.p1Blasts[state.p1Index]!.mana, false);
+                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, false);
             }
 
             SendTurnState(dispatcher, state, OpCodes.NEW_BATTLE_TURN);

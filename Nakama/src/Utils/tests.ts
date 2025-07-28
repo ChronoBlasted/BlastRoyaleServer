@@ -56,8 +56,9 @@ function rpcCalculateExpGain(context: nkruntime.Context, logger: nkruntime.Logge
 
     var result = calculateExperienceGain(
         params.expYield,
-        params.enemyLevel,
         params.yourLevel,
+        params.enemyLevel,
+
     );
 
     return JSON.stringify(result);

@@ -12,6 +12,47 @@ function calculateBlastMana(baseMana: number, iv: number, level: number): number
     return Math.floor(((baseMana + iv) * level) / 100) + 10;
 }
 
+
+
+function getLevel(blast: BlastEntity): number {
+    return calculateLevelFromExperience(blast.exp);
+}
+
+function getMaxHp(blast: BlastEntity): number {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastHp(data.hp, blast.iv, getLevel(blast));
+}
+
+function getMaxMana(blast: BlastEntity): number {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastMana(data.mana, blast.iv, getLevel(blast));
+}
+
+function getAttack(blast: BlastEntity): number {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastStat(data.attack, blast.iv, getLevel(blast));
+}
+
+function getDefense(blast: BlastEntity): number {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastStat(data.defense, blast.iv, getLevel(blast));
+}
+
+function getSpeed(blast: BlastEntity): number {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastStat(data.speed, blast.iv, getLevel(blast));
+}
+
+function getRatioExp(blast: BlastEntity): number {
+    return blast.exp - calculateExperienceFromLevel(getLevel(blast));
+}
+
+function getRatioExpNextLevel(blast: BlastEntity): number {
+    return calculateExperienceFromLevel(getLevel(blast) + 1) - calculateExperienceFromLevel(getLevel(blast));
+}
+
+
+
 function calculateLevelFromExperience(experience: number): number {
     if (experience < 0) {
         throw new Error("L'expérience totale ne peut pas être négative.");
@@ -28,7 +69,7 @@ function calculateExperienceFromLevel(level: number): number {
     return Math.pow(level, 3);
 }
 
-function calculateExperienceGain(expYield: number, enemyLevel: number, yourLevel: number): number {
+function calculateExperienceGain(expYield: number, yourLevel: number, enemyLevel: number): number {
     const experience: number = Math.floor(((expYield * enemyLevel / 7) * ((2 * enemyLevel + 10) / (enemyLevel + yourLevel + 10)) + 1));
     return experience;
 }
@@ -50,6 +91,12 @@ function ConvertBlastToBlastEntity(blast: Blast): BlastEntity {
 
     return blastEntity as BlastEntity;
 }
+
+function restoreBlastPrototype(obj: any): BlastEntity {
+    Object.setPrototypeOf(obj, BlastEntity.prototype);
+    return obj as BlastEntity;
+}
+
 
 // region Utils
 

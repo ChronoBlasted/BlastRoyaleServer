@@ -44,19 +44,12 @@ class BlastEntity {
     boss: boolean;
     shiny: boolean;
 
-    maxHp: number;
     hp: number;
-    maxMana: number;
     mana: number;
 
     status: Status;
     activeMoveset: number[];
     modifiers: modifierBlastStruct[];
-    level: number;
-
-    attack: number;
-    defense: number;
-    speed: number;
 
     constructor(uuid: string, data_id: number, exp: number, iv: number, boss: boolean, shiny: boolean, moveset: number[]) {
         this.uuid = uuid;
@@ -70,18 +63,11 @@ class BlastEntity {
 
         this.status = Status.None;
 
-        this.level = calculateLevelFromExperience(this.exp);
-
-        this.maxHp = calculateBlastHp(getBlastDataById(this.data_id).hp, this.iv, this.level);
-        this.hp = this.maxHp;
-        this.maxMana = calculateBlastMana(getBlastDataById(this.data_id).mana, this.iv, this.level);
-        this.mana = this.maxMana;
-
-        this.attack = calculateBlastStat(getBlastDataById(this.data_id).attack, this.iv, this.level);
-        this.defense = calculateBlastStat(getBlastDataById(this.data_id).defense, this.iv, this.level);
-        this.speed = calculateBlastStat(getBlastDataById(this.data_id).speed, this.iv, this.level);
+        this.hp = getMaxHp(this);
+        this.mana = getMaxMana(this);
     }
 }
+
 
 // BlastData
 
@@ -166,14 +152,8 @@ const Kitchi: BlastData = { // NORMAL
     type: Type.Normal,
     hp: 55, mana: 70, attack: 75, defense: 65, speed: 80,
     movepool: [
-        { move_id: Claw.id, levelMin: 0 },
-        { move_id: Growl.id, levelMin: 2 },
-        { move_id: Cut.id, levelMin: 4 },
-        { move_id: Harden.id, levelMin: 6 },
-        { move_id: QuickAttack.id, levelMin: 7 },
-        { move_id: ClawCombo.id, levelMin: 8 },
-        { move_id: Cleanse.id, levelMin: 10 },
-        { move_id: Slash.id, levelMin: 14 },
+        { move_id: Growl.id, levelMin: 0 },
+
     ],
     nextEvolution: { id: 5, levelRequired: 7 }, catchRate: 30, expYield: 64, rarity: Rarity.Common,
 };
@@ -183,14 +163,14 @@ const Kenchi: BlastData = { // NORMAL
     type: Type.Normal,
     hp: 50, mana: 70, attack: 80, defense: 70, speed: 65,
     movepool: [
-        { move_id: Claw.id, levelMin: 0 },
-        { move_id: Growl.id, levelMin: 2 },
-        { move_id: Cut.id, levelMin: 4 },
-        { move_id: Harden.id, levelMin: 6 },
-        { move_id: QuickAttack.id, levelMin: 7 },
-        { move_id: ClawCombo.id, levelMin: 8 },
-        { move_id: Cleanse.id, levelMin: 10 },
-        { move_id: Slash.id, levelMin: 14 },
+        // { move_id: Claw.id, levelMin: 0 },
+        { move_id: Growl.id, levelMin: 0 },
+        // { move_id: Cut.id, levelMin: 4 },
+        // { move_id: Harden.id, levelMin: 6 },
+        // { move_id: QuickAttack.id, levelMin: 7 },
+        // { move_id: ClawCombo.id, levelMin: 8 },
+        // { move_id: Cleanse.id, levelMin: 10 },
+        // { move_id: Slash.id, levelMin: 14 },
     ],
     nextEvolution: null, catchRate: 35, expYield: 96, rarity: Rarity.Uncommon,
 };
@@ -200,14 +180,8 @@ const Mousy: BlastData = { // NORMAL
     type: Type.Normal,
     hp: 50, mana: 75, attack: 75, defense: 70, speed: 80,
     movepool: [
-        { move_id: Claw.id, levelMin: 0 },
-        { move_id: Growl.id, levelMin: 2 },
-        { move_id: Cut.id, levelMin: 4 },
-        { move_id: Harden.id, levelMin: 6 },
-        { move_id: Cleanse.id, levelMin: 8 },
-        { move_id: ClawCombo.id, levelMin: 12 },
-        { move_id: Slash.id, levelMin: 14 },
-        { move_id: QuickAttack.id, levelMin: 16 },
+        { move_id: Growl.id, levelMin: 0 },
+
     ],
     nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.Common,
 };
@@ -217,18 +191,8 @@ const Clawball: BlastData = { // NORMAL (GROUND n'a pas d'attaque dédiée)
     type: Type.Ground,
     hp: 47, mana: 70, attack: 75, defense: 80, speed: 65,
     movepool: [
-        { move_id: Claw.id, levelMin: 0 },
-        { move_id: QuickAttack.id, levelMin: 2 },
-        { move_id: Cut.id, levelMin: 4 },
-        { move_id: Harden.id, levelMin: 6 },
-        { move_id: Cleanse.id, levelMin: 8 },
-        { move_id: ClawCombo.id, levelMin: 12 },
-        { move_id: Slash.id, levelMin: 14 },
-        { move_id: Growl.id, levelMin: 16 },
-        { move_id: Stomp.id, levelMin: 20 },
-        { move_id: Slam.id, levelMin: 22 },
-        { move_id: Harden.id, levelMin: 26 },
-        { move_id: Cleanse.id, levelMin: 32 },
+        { move_id: Growl.id, levelMin: 0 },
+
     ],
     nextEvolution: null, catchRate: 45, expYield: 90, rarity: Rarity.Uncommon,
 };

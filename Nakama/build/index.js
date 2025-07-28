@@ -132,6 +132,633 @@ var Stats;
     Stats[Stats["Speed"] = 424] = "Speed";
 })(Stats || (Stats = {}));
 //#endregion
+const healManaPerRound = 20;
+const healManaPerWait = 50;
+var BattleState;
+(function (BattleState) {
+    BattleState[BattleState["None"] = 0] = "None";
+    BattleState[BattleState["Start"] = 1] = "Start";
+    BattleState[BattleState["Waiting"] = 2] = "Waiting";
+    BattleState[BattleState["Ready"] = 3] = "Ready";
+    BattleState[BattleState["ResolveTurn"] = 4] = "ResolveTurn";
+    BattleState[BattleState["WaitingForPlayerSwap"] = 5] = "WaitingForPlayerSwap";
+    BattleState[BattleState["ReadyForPlayerSwap"] = 6] = "ReadyForPlayerSwap";
+    BattleState[BattleState["ResolvePlayerSwap"] = 7] = "ResolvePlayerSwap";
+    BattleState[BattleState["WaitForPlayerChooseOffer"] = 8] = "WaitForPlayerChooseOffer";
+    BattleState[BattleState["End"] = 9] = "End";
+})(BattleState || (BattleState = {}));
+var PlayerState;
+(function (PlayerState) {
+    PlayerState[PlayerState["None"] = 0] = "None";
+    PlayerState[PlayerState["Busy"] = 1] = "Busy";
+    PlayerState[PlayerState["Ready"] = 2] = "Ready";
+})(PlayerState || (PlayerState = {}));
+var WinnerEnum;
+(function (WinnerEnum) {
+    WinnerEnum[WinnerEnum["None"] = 0] = "None";
+    WinnerEnum[WinnerEnum["Player1"] = 1] = "Player1";
+    WinnerEnum[WinnerEnum["Player2"] = 2] = "Player2";
+    WinnerEnum[WinnerEnum["Player3"] = 3] = "Player3";
+    WinnerEnum[WinnerEnum["Player4"] = 4] = "Player4";
+    WinnerEnum[WinnerEnum["Tie"] = 5] = "Tie";
+})(WinnerEnum || (WinnerEnum = {}));
+var TurnType;
+(function (TurnType) {
+    TurnType[TurnType["None"] = 0] = "None";
+    TurnType[TurnType["Attack"] = 1] = "Attack";
+    TurnType[TurnType["Item"] = 2] = "Item";
+    TurnType[TurnType["Swap"] = 3] = "Swap";
+    TurnType[TurnType["Wait"] = 4] = "Wait";
+    TurnType[TurnType["Status"] = 5] = "Status";
+    TurnType[TurnType["Leave"] = 6] = "Leave";
+})(TurnType || (TurnType = {}));
+//#region Damage Calculation
+function calculateDamage(attackerLevel, attackerAttack, defenderDefense, attackType, defenderType, movePower, meteo, logger) {
+    const weatherModifier = calculateWeatherModifier(meteo, attackType);
+    const typeMultiplier = getTypeMultiplier(attackType, defenderType, logger);
+    const baseDamage = ((2 * attackerLevel / 5 + 2) * movePower * (attackerAttack / defenderDefense)) / 50;
+    const damage = baseDamage * typeMultiplier * weatherModifier;
+    return Math.floor(damage);
+}
+function getTypeMultiplier(moveType, defenderType, logger) {
+    switch (moveType) {
+        case Type.Fire:
+            switch (defenderType) {
+                case Type.Grass:
+                    return 2;
+                case Type.Water:
+                    return 0.5;
+                default:
+                    return 1;
+            }
+        case Type.Water:
+            switch (defenderType) {
+                case Type.Fire:
+                    return 2;
+                case Type.Grass:
+                    return 0.5;
+                default:
+                    return 1;
+            }
+        case Type.Grass:
+            switch (defenderType) {
+                case Type.Water:
+                    return 2;
+                case Type.Fire:
+                    return 0.5;
+                default:
+                    return 1;
+            }
+        case Type.Normal:
+            switch (defenderType) {
+                case Type.Light:
+                    return 0.5;
+                case Type.Dark:
+                    return 0.5;
+                default:
+                    return 1;
+            }
+        case Type.Ground:
+            switch (defenderType) {
+                case Type.Electric:
+                    return 2;
+                case Type.Fly:
+                    return 0;
+                default:
+                    return 1;
+            }
+        case Type.Fly:
+            switch (defenderType) {
+                case Type.Electric:
+                    return 0;
+                case Type.Ground:
+                    return 2;
+                default:
+                    return 1;
+            }
+        case Type.Electric:
+            switch (defenderType) {
+                case Type.Ground:
+                    return 0;
+                case Type.Fly:
+                    return 2;
+                default:
+                    return 1;
+            }
+        case Type.Light:
+            switch (defenderType) {
+                case Type.Dark:
+                    return 2;
+                case Type.Normal:
+                    return 2;
+                case Type.Light:
+                    return 0.5;
+                default:
+                    return 1;
+            }
+        case Type.Dark:
+            switch (defenderType) {
+                case Type.Light:
+                    return 2;
+                case Type.Normal:
+                    return 2;
+                case Type.Dark:
+                    return 0.5;
+                default:
+                    return 1;
+            }
+        default:
+            return 1;
+    }
+}
+function calculateWeatherModifier(weather, moveType) {
+    let modifier = 1.0;
+    switch (weather) {
+        case Meteo.Sun:
+            if (moveType === Type.Fire) {
+                modifier = 1.5;
+            }
+            break;
+        case Meteo.Rain:
+            if (moveType === Type.Water) {
+                modifier = 1.5;
+            }
+            break;
+        case Meteo.Leaves:
+            if (moveType === Type.Grass) {
+                modifier = 1.5;
+            }
+            break;
+        case Meteo.None:
+            break;
+    }
+    return modifier;
+}
+function calculateEffectWithProbability(blast, move, effectData) {
+    const statusEffectProbabilities = {
+        [MoveEffect.Burn]: 0.1,
+        [MoveEffect.Seeded]: 0.1,
+        [MoveEffect.Wet]: 0.1,
+        [MoveEffect.ManaExplosion]: 0.2,
+        [MoveEffect.HpExplosion]: 0.2,
+        [MoveEffect.ManaRestore]: 0.2,
+        [MoveEffect.HpRestore]: 0.2,
+        [MoveEffect.AttackBoost]: 0.5,
+        [MoveEffect.DefenseBoost]: 0.5,
+        [MoveEffect.SpeedBoost]: 0.5,
+        [MoveEffect.AttackReduce]: 0.5,
+        [MoveEffect.DefenseReduce]: 0.5,
+        [MoveEffect.SpeedReduce]: 0.5,
+        [MoveEffect.Cleanse]: 0.5,
+    };
+    const effectProbability = statusEffectProbabilities[effectData.effect];
+    if (Math.random() < effectProbability) {
+        return { blast: applyEffect(blast, move, effectData), moveEffect: effectData };
+    }
+    return { blast, moveEffect: { effect: MoveEffect.None, effectModifier: 0, effectTarget: Target.None } };
+}
+function applyEffect(blast, move, effectData) {
+    var isStatusMove = move.attackType === AttackType.Status;
+    switch (effectData.effect) {
+        case MoveEffect.Burn:
+            blast.status = Status.Burn;
+            break;
+        case MoveEffect.Seeded:
+            blast.status = Status.Seeded;
+            break;
+        case MoveEffect.Wet:
+            blast.status = Status.Wet;
+            break;
+        case MoveEffect.ManaExplosion:
+            const manaDmg = Math.floor(getMaxMana(blast) / 2);
+            blast.hp = Math.max(0, blast.hp - manaDmg);
+            blast.mana = Math.floor(blast.mana / 2);
+            break;
+        case MoveEffect.HpExplosion:
+            const hpCost = Math.floor(getMaxHp(blast) / 3);
+            blast.hp = Math.max(0, blast.hp - hpCost);
+            break;
+        case MoveEffect.ManaRestore:
+            blast.mana = Math.min(getMaxMana(blast), blast.mana + move.power);
+            break;
+        case MoveEffect.HpRestore:
+            blast.hp = Math.min(getMaxHp(blast), blast.hp + move.power);
+            break;
+        case MoveEffect.AttackBoost:
+            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Attack, isStatusMove ? effectData.effectModifier : 1);
+            break;
+        case MoveEffect.DefenseBoost:
+            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Defense, isStatusMove ? effectData.effectModifier : 1);
+            break;
+        case MoveEffect.SpeedBoost:
+            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Speed, isStatusMove ? effectData.effectModifier : 1);
+            break;
+        case MoveEffect.AttackReduce:
+            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Attack, isStatusMove ? -effectData.effectModifier : -1);
+            break;
+        case MoveEffect.DefenseReduce:
+            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Defense, isStatusMove ? -effectData.effectModifier : -1);
+            break;
+        case MoveEffect.SpeedReduce:
+            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Speed, isStatusMove ? -effectData.effectModifier : -1);
+            break;
+        case MoveEffect.Cleanse:
+            blast.status = Status.None;
+            break;
+    }
+    return blast;
+}
+function getStatModifier(stat, modifiers) {
+    var modifier = modifiers.find(m => m.stats === stat);
+    if (!modifier)
+        return 1;
+    const amount = modifier.amount;
+    if (amount > 0) {
+        if (amount === 1)
+            return 1.5;
+        if (amount === 2)
+            return 2;
+        return 3;
+    }
+    else if (amount < 0) {
+        if (amount === -1)
+            return 0.8;
+        if (amount === -2)
+            return 0.6;
+        return 0.2;
+    }
+    return 1;
+}
+function updateStatModifier(mods, stat, delta) {
+    const index = mods.findIndex((m) => m.stats === stat);
+    if (index >= 0) {
+        mods[index].amount += delta;
+        if (mods[index].amount <= 0)
+            mods.splice(index, 1);
+    }
+    else if (delta > 0) {
+        mods.push({ stats: stat, amount: delta });
+    }
+    return mods;
+}
+function applyStatusEffectAtEndOfTurn(blast, otherBlast) {
+    switch (blast.status) {
+        case Status.Burn:
+            blast.hp = Math.max(0, blast.hp - Math.floor(getMaxHp(blast) / 16));
+            break;
+        case Status.Seeded:
+            const healAmount = Math.floor(getMaxHp(blast) / 16);
+            blast.hp = Math.max(0, blast.hp - healAmount);
+            otherBlast.hp = Math.min(getMaxHp(otherBlast), otherBlast.hp + healAmount);
+            break;
+        case Status.Wet:
+            blast.mana = Math.max(0, blast.mana - Math.floor(getMaxMana(blast) / 32));
+            break;
+        default:
+            break;
+    }
+    return { blast, otherBlast };
+}
+function addPlatformType(p_platform, newType) {
+    if (p_platform.length < 3) {
+        p_platform.push(newType);
+    }
+    else {
+        p_platform.shift();
+        p_platform.push(newType);
+    }
+    return p_platform;
+}
+function getAmountOfPlatformTypeByType(p_platform, typeToCount) {
+    return p_platform.filter(type => type === typeToCount).length;
+}
+function removePlatformTypeByType(p_platform, typeToRemove, numberToRemove) {
+    let removedCount = 0;
+    for (let i = p_platform.length - 1; i >= 0 && removedCount < numberToRemove; i--) {
+        if (p_platform[i] === typeToRemove) {
+            p_platform.splice(i, 1);
+            removedCount++;
+        }
+    }
+    return p_platform;
+}
+//#region Health and Mana and Status
+function isAllBlastDead(allPlayerBlasts) {
+    return allPlayerBlasts.every((blast) => blast.hp === 0);
+}
+function isBlastAlive(blast) {
+    return blast.hp > 0;
+}
+function getFirstAliveBlastIndex(allPlayerBlasts) {
+    return allPlayerBlasts.findIndex(blast => isBlastAlive(blast));
+}
+function countDefeatedBlasts(allPlayerBlasts) {
+    return allPlayerBlasts.filter(blast => !isBlastAlive(blast)).length;
+}
+function calculateManaRecovery(maxMana, currentMana, useWait = false) {
+    const normalRecovery = Math.floor(maxMana * 0.2);
+    const waitRecovery = Math.floor(maxMana * 0.5);
+    let recoveredMana = currentMana + (useWait ? waitRecovery : normalRecovery);
+    if (recoveredMana > maxMana) {
+        recoveredMana = maxMana;
+    }
+    return recoveredMana;
+}
+function healHealthBlast(blast, amount) {
+    blast.hp += amount;
+    if (blast.hp > getMaxHp(blast))
+        blast.hp = getMaxHp(blast);
+    return blast;
+}
+function healManaBlast(blast, amount) {
+    blast.mana += amount;
+    if (blast.mana > getMaxMana(blast))
+        blast.mana = getMaxMana(blast);
+    return blast;
+}
+function healStatusBlast(blast, status) {
+    if (blast.status == status || status == Status.All)
+        blast.status = Status.None;
+    return blast;
+}
+// #region round logic
+function getFasterBlast(blast1, blast2) {
+    if (getSpeed(blast1) === getSpeed(blast2)) {
+        return Math.random() < 0.5;
+    }
+    else {
+        return getSpeed(blast1) > getSpeed(blast2);
+    }
+}
+function getRandomMeteo() {
+    const values = Object.values(Meteo).filter(value => typeof value === "number");
+    return randomElement(values);
+}
+function getRandomUsableMove(allMoves, currentMana, currentPlatformTypes) {
+    const usableMoves = [];
+    for (const move of allMoves) {
+        switch (move.attackType) {
+            case AttackType.Normal:
+            case AttackType.Status:
+                if (currentMana < move.cost)
+                    continue;
+                break;
+            case AttackType.Special: {
+                const energyCount = getAmountOfPlatformTypeByType(currentPlatformTypes, move.type);
+                if (energyCount < move.cost)
+                    continue;
+                break;
+            }
+        }
+        usableMoves.push(move);
+    }
+    if (usableMoves.length === 0) {
+        return -1;
+    }
+    const randomIndex = Math.floor(Math.random() * usableMoves.length);
+    return allMoves.indexOf(usableMoves[randomIndex]);
+}
+function compareActionPriorities(p1ActionType, p2ActionType) {
+    const p1Priority = getActionPriority(p1ActionType);
+    const p2Priority = getActionPriority(p2ActionType);
+    return p1Priority >= p2Priority;
+}
+function getActionPriority(turnType) {
+    switch (turnType) {
+        case TurnType.Attack:
+            return 2;
+        case TurnType.Swap:
+            return 4;
+        case TurnType.Item:
+            return 3;
+        case TurnType.Wait:
+            return 1;
+        default:
+            return 0;
+    }
+}
+function performAttackSequence(state, dispatcher, nk, logger) {
+    const p1Blast = state.p1Blasts[state.p1Index];
+    const p2Blast = state.p2Blasts[state.p2Index];
+    const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
+    const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
+    let p1First = false;
+    if (p1Move.priority === p2Move.priority) {
+        p1First = getFasterBlast(p1Blast, p2Blast);
+    }
+    else {
+        p1First = p1Move.priority > p2Move.priority;
+    }
+    state.turnStateData.p1TurnPriority = p1First;
+    if (p1First) {
+        executePlayerAttack(true, state, logger, nk, dispatcher);
+        if (state.battleState === BattleState.ResolveTurn) {
+            executePlayerAttack(false, state, logger, nk, dispatcher);
+        }
+    }
+    else {
+        executePlayerAttack(false, state, logger, nk, dispatcher);
+        if (state.battleState === BattleState.ResolveTurn) {
+            executePlayerAttack(true, state, logger, nk, dispatcher);
+        }
+    }
+    return state;
+}
+function executePlayerAttack(isP1, state, logger, nk, dispatcher) {
+    const p1Blast = state.p1Blasts[state.p1Index];
+    const p2Blast = state.p2Blasts[state.p2Index];
+    const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
+    const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
+    const move = isP1 ? p1Move : p2Move;
+    const attacker = isP1 ? p1Blast : p2Blast;
+    const defender = isP1 ? p2Blast : p1Blast;
+    const attackerPlatform = isP1 ? state.player1Platform : state.player2Platform;
+    const setAttacker = (b) => {
+        if (isP1)
+            state.p1Blasts[state.p1Index] = b;
+        else
+            state.p2Blasts[state.p2Index] = b;
+    };
+    const setDefender = (b) => {
+        if (isP1)
+            state.p2Blasts[state.p2Index] = b;
+        else
+            state.p1Blasts[state.p1Index] = b;
+    };
+    const turnData = isP1 ? state.turnStateData.p1TurnData : state.turnStateData.p2TurnData;
+    ExecuteAttack({
+        move,
+        attacker,
+        defender,
+        attackerPlatforms: attackerPlatform,
+        setAttacker,
+        setDefender,
+        getTurnData: () => turnData,
+        setMoveDamage: dmg => turnData.moveDamage = dmg,
+        setMoveEffect: eff => turnData.moveEffects = eff,
+        meteo: state.meteo,
+        dispatcher
+    }, logger);
+    if (isBlastAlive(defender) == false)
+        addExpOnBlastInGame(nk, logger, isP1 ? state.player1Id : state.player2Id, attacker, defender);
+    checkIfMatchContinue(state);
+    return state;
+}
+function ExecuteAttack(ctx, logger) {
+    // Gestion mana/plateforme
+    switch (ctx.move.attackType) {
+        case AttackType.Normal:
+        case AttackType.Status:
+            if (ctx.attacker.mana < ctx.move.cost)
+                return;
+            ctx.attacker.mana = clamp(ctx.attacker.mana - ctx.move.cost, 0, Number.POSITIVE_INFINITY);
+            ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
+            if (calculateWeatherModifier(ctx.meteo, ctx.move.type) > 1) {
+                ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
+            }
+            break;
+        case AttackType.Special: {
+            const platformCount = getAmountOfPlatformTypeByType(ctx.attackerPlatforms, ctx.move.type);
+            if (platformCount < ctx.move.cost)
+                return;
+            ctx.attackerPlatforms = removePlatformTypeByType(ctx.attackerPlatforms, ctx.move.type, ctx.move.cost);
+            break;
+        }
+    }
+    // Application des effets
+    const effects = ApplyMoveEffects(ctx.move, () => ctx.defender, ctx.setDefender, () => ctx.attacker, ctx.setAttacker);
+    ctx.setMoveEffect(effects);
+    let damage = 0;
+    // Application des dégâts
+    if (ctx.move.target === Target.Opponent) {
+        damage = ApplyBlastAttack(ctx.attacker, ctx.defender, ctx.move, ctx.meteo, logger);
+        ctx.setMoveDamage(damage);
+    }
+    return;
+}
+function ApplyBlastAttack(attacker, defender, move, meteo, logger) {
+    const attackerAttack = getAttack(attacker) * getStatModifier(Stats.Attack, attacker.modifiers);
+    const defenderDefense = getDefense(defender) * getStatModifier(Stats.Defense, defender.modifiers);
+    const moveType = move.type;
+    const defenderType = getBlastDataById(defender.data_id).type;
+    const movePower = move.power;
+    const damage = calculateDamage(getLevel(attacker), attackerAttack, defenderDefense, moveType, defenderType, movePower, meteo, logger);
+    logger.debug("[DEBUG] defender.hp BEFORE:", defender.hp, "type:", typeof defender.hp);
+    logger.debug("[DEBUG] damage:", damage, "type:", typeof damage);
+    defender.hp = clamp(defender.hp - damage, 0, Number.POSITIVE_INFINITY);
+    return damage;
+}
+function ApplyMoveEffects(move, getTargetBlast, setTargetBlast, getAttacker, setAttacker) {
+    if (!move.effects || move.effects.length === 0)
+        return [];
+    const effectsThisTurn = [];
+    for (const effectData of move.effects) {
+        if (effectData.effect === MoveEffect.None)
+            continue;
+        let getTarget;
+        let setTarget;
+        if (effectData.effectTarget === Target.Self) {
+            getTarget = getAttacker;
+            setTarget = setAttacker;
+        }
+        else {
+            getTarget = getTargetBlast;
+            setTarget = setTargetBlast;
+        }
+        if (move.attackType === AttackType.Special || move.attackType === AttackType.Status) {
+            const updated = applyEffect(getTarget(), move, effectData);
+            setTarget(updated);
+            effectsThisTurn.push(effectData);
+        }
+        else {
+            const result = calculateEffectWithProbability(getTarget(), move, effectData);
+            setTarget(result.blast);
+            effectsThisTurn.push(result.moveEffect);
+        }
+    }
+    return effectsThisTurn;
+}
+function checkIfMatchContinue(state) {
+    const p1Blast = state.p1Blasts[state.p1Index];
+    const p2Blast = state.p2Blasts[state.p2Index];
+    const p1Alive = isBlastAlive(p1Blast);
+    const p2Alive = isBlastAlive(p2Blast);
+    const allP1Dead = isAllBlastDead(state.p1Blasts);
+    const allP2Dead = isAllBlastDead(state.p2Blasts);
+    if (allP1Dead && allP2Dead) {
+        state.battleState = BattleState.End;
+        state.winner = WinnerEnum.Tie;
+    }
+    else if (allP2Dead) {
+        state.battleState = BattleState.End;
+        state.winner = WinnerEnum.Player1;
+    }
+    else if (!p2Alive) {
+        state.battleState = BattleState.WaitingForPlayerSwap;
+    }
+    else if (allP1Dead) {
+        state.battleState = BattleState.End;
+        state.winner = WinnerEnum.Player2;
+    }
+    else if (!p1Alive) {
+        state.battleState = BattleState.WaitingForPlayerSwap;
+    }
+    return state;
+}
+function trySwapBlast(currentIndex, turnData, blasts, updateIndex, state, dispatcher) {
+    const targetIndex = clamp(turnData.index, 0, blasts.length - 1);
+    if (currentIndex === targetIndex) {
+        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
+        return true;
+    }
+    if (!isBlastAlive(blasts[targetIndex])) {
+        ErrorFunc(state, "Cannot change actual blast with dead blast in Ready", dispatcher, BattleState.Ready);
+        return true;
+    }
+    updateIndex(targetIndex);
+    return false;
+}
+// #region Others
+function addExpOnBlastInGame(nk, logger, playerId, currentPlayerBlast, enemyBlast) {
+    let expToAdd = calculateExperienceGain(getBlastDataById(enemyBlast.data_id).expYield, calculateLevelFromExperience(currentPlayerBlast.exp), calculateLevelFromExperience(enemyBlast.exp));
+    currentPlayerBlast.exp += expToAdd;
+    addExpOnBlast(nk, logger, playerId, currentPlayerBlast.uuid, expToAdd);
+}
+function calculateCaptureProbability(currentHP, maxHP, catchRate, trapBonus, statusBonus) {
+    const hpFactor = (3 * maxHP - 2 * currentHP) / (3 * maxHP);
+    const baseProbability = catchRate * hpFactor * trapBonus * statusBonus;
+    const captureProbability = Math.min(Math.max(baseProbability, 0), 1);
+    return captureProbability;
+}
+function isBlastCaptured(currentHP, maxHP, catchRate, trapBonus, statusBonus) {
+    const captureProbability = calculateCaptureProbability(currentHP, maxHP, catchRate, trapBonus, statusBonus) * 100;
+    const randomValue = Math.random() * 100;
+    return randomValue <= captureProbability;
+}
+function isShiny(probability = 1 / 1024) {
+    return Math.random() < probability;
+}
+function EndLoopDebug(logger, state) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    logger.debug('______________ END LOOP BATTLE ______________');
+    logger.debug('Player blast HP : %h, Mana : %m, Exp : %e,Level : %l', (_a = state.p1Blasts) === null || _a === void 0 ? void 0 : _a[state.p1Index].hp, (_b = state.p1Blasts) === null || _b === void 0 ? void 0 : _b[state.p1Index].mana, getRatioExp((_c = state.p1Blasts) === null || _c === void 0 ? void 0 : _c[state.p1Index]), getLevel((_d = state.p1Blasts) === null || _d === void 0 ? void 0 : _d[state.p1Index]));
+    logger.debug('Opponent blast HP : %h, Mana : %m, Exp : %e,Level : %l', (_e = state.p2Blasts) === null || _e === void 0 ? void 0 : _e[state.p2Index].hp, (_f = state.p2Blasts) === null || _f === void 0 ? void 0 : _f[state.p2Index].mana, getRatioExp((_g = state.p2Blasts) === null || _g === void 0 ? void 0 : _g[state.p2Index]), getLevel((_h = state.p2Blasts) === null || _h === void 0 ? void 0 : _h[state.p2Index]));
+}
+function ConnectedPlayers(s) {
+    let count = 0;
+    for (const p of Object.keys(s.presences)) {
+        if (s.presences[p] !== null) {
+            count++;
+        }
+    }
+    return count;
+}
+function ErrorFunc(state, error, dispatcher, currentBattleState) {
+    state.battleState = currentBattleState;
+    state.player1State = PlayerState.Ready;
+    dispatcher.broadcastMessage(OpCodes.ERROR_SERV, JSON.stringify(error));
+    return { state };
+}
 const pveBattleButtonAds = 'pveBattleButtonAds';
 const pvpBattleButtonAds = 'pvpBattleButtonAds';
 function rpcWatchPvEBattleAds(context, logger, nk, payload) {
@@ -172,7 +799,7 @@ function rpcWatchQuestAds(context, logger, nk, payload) {
     if (!context.userId) {
         throw Error('No user ID in context');
     }
-    incrementQuest(context.userId, QuestIds.WATCH_AD, 1, nk, logger);
+    incrementQuest(context.userId, QuestType.WatchAd, 1, nk, logger);
 }
 const SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000000";
 const FRIEND_CODE_COLLECTION = "system";
@@ -192,7 +819,7 @@ const DefaultMetadata = {
 };
 function afterAuthenticate(ctx, logger, nk, data) {
     createDailyQuestStorageIfNeeded(ctx.userId, nk, logger);
-    incrementQuest(ctx.userId, QuestIds.LOGIN, 1, nk, logger);
+    incrementQuest(ctx.userId, QuestType.Login, 1, nk, logger);
     if (!data.created) {
         logger.info('User with id: %s account data already existing', ctx.userId);
         return;
@@ -347,7 +974,7 @@ function rpcCalculateExpGain(context, logger, nk, payload) {
         enemyLevel: raw.enemyLevel,
         yourLevel: raw.yourLevel,
     };
-    var result = calculateExperienceGain(params.expYield, params.enemyLevel, params.yourLevel);
+    var result = calculateExperienceGain(params.expYield, params.yourLevel, params.enemyLevel);
     return JSON.stringify(result);
 }
 function rpcCalculateLevelFromExp(context, logger, nk, payload) {
@@ -419,6 +1046,35 @@ function calculateBlastHp(baseHp, iv, level) {
 function calculateBlastMana(baseMana, iv, level) {
     return Math.floor(((baseMana + iv) * level) / 100) + 10;
 }
+function getLevel(blast) {
+    return calculateLevelFromExperience(blast.exp);
+}
+function getMaxHp(blast) {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastHp(data.hp, blast.iv, getLevel(blast));
+}
+function getMaxMana(blast) {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastMana(data.mana, blast.iv, getLevel(blast));
+}
+function getAttack(blast) {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastStat(data.attack, blast.iv, getLevel(blast));
+}
+function getDefense(blast) {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastStat(data.defense, blast.iv, getLevel(blast));
+}
+function getSpeed(blast) {
+    const data = getBlastDataById(blast.data_id);
+    return calculateBlastStat(data.speed, blast.iv, getLevel(blast));
+}
+function getRatioExp(blast) {
+    return blast.exp - calculateExperienceFromLevel(getLevel(blast));
+}
+function getRatioExpNextLevel(blast) {
+    return calculateExperienceFromLevel(getLevel(blast) + 1) - calculateExperienceFromLevel(getLevel(blast));
+}
 function calculateLevelFromExperience(experience) {
     if (experience < 0) {
         throw new Error("L'expérience totale ne peut pas être négative.");
@@ -431,7 +1087,7 @@ function calculateExperienceFromLevel(level) {
     }
     return Math.pow(level, 3);
 }
-function calculateExperienceGain(expYield, enemyLevel, yourLevel) {
+function calculateExperienceGain(expYield, yourLevel, enemyLevel) {
     const experience = Math.floor(((expYield * enemyLevel / 7) * ((2 * enemyLevel + 10) / (enemyLevel + yourLevel + 10)) + 1));
     return experience;
 }
@@ -446,6 +1102,10 @@ function getRandomActiveMoveset(blastData, exp) {
 function ConvertBlastToBlastEntity(blast) {
     const blastEntity = new BlastEntity(blast.uuid, blast.data_id, blast.exp, blast.iv, blast.boss, blast.shiny, blast.activeMoveset);
     return blastEntity;
+}
+function restoreBlastPrototype(obj) {
+    Object.setPrototypeOf(obj, BlastEntity.prototype);
+    return obj;
 }
 // region Utils
 function clamp(value, min, max) {
@@ -729,7 +1389,7 @@ const Cleanse = {
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
-    cost: 0,
+    cost: 10,
     priority: 0,
     effects: [
         { effect: MoveEffect.Cleanse, effectModifier: 0, effectTarget: Target.Self },
@@ -741,7 +1401,7 @@ const Focus = {
     attackType: AttackType.Status,
     target: Target.Self,
     power: 0,
-    cost: 0,
+    cost: 8,
     priority: 0,
     effects: [
         { effect: MoveEffect.AttackBoost, effectModifier: 2, effectTarget: Target.Self },
@@ -1363,14 +2023,8 @@ class BlastEntity {
         this.activeMoveset = moveset;
         this.modifiers = [];
         this.status = Status.None;
-        this.level = calculateLevelFromExperience(this.exp);
-        this.maxHp = calculateBlastHp(getBlastDataById(this.data_id).hp, this.iv, this.level);
-        this.hp = this.maxHp;
-        this.maxMana = calculateBlastMana(getBlastDataById(this.data_id).mana, this.iv, this.level);
-        this.mana = this.maxMana;
-        this.attack = calculateBlastStat(getBlastDataById(this.data_id).attack, this.iv, this.level);
-        this.defense = calculateBlastStat(getBlastDataById(this.data_id).defense, this.iv, this.level);
-        this.speed = calculateBlastStat(getBlastDataById(this.data_id).speed, this.iv, this.level);
+        this.hp = getMaxHp(this);
+        this.mana = getMaxMana(this);
     }
 }
 // BlastData
@@ -1460,7 +2114,7 @@ const Kitchi = {
         { move_id: Cleanse.id, levelMin: 10 },
         { move_id: Slash.id, levelMin: 14 },
     ],
-    nextEvolution: { id: 5, levelRequired: 7 }, catchRate: 30, expYield: 64, rarity: Rarity.Common,
+    nextEvolution: { id: 5, levelRequired: 7 }, catchRate: 30, expYield: 640, rarity: Rarity.Common,
 };
 const Kenchi = {
     id: 5,
@@ -1476,7 +2130,7 @@ const Kenchi = {
         { move_id: Cleanse.id, levelMin: 10 },
         { move_id: Slash.id, levelMin: 14 },
     ],
-    nextEvolution: null, catchRate: 35, expYield: 96, rarity: Rarity.Uncommon,
+    nextEvolution: null, catchRate: 35, expYield: 960, rarity: Rarity.Uncommon,
 };
 const Mousy = {
     id: 6,
@@ -1492,7 +2146,7 @@ const Mousy = {
         { move_id: Slash.id, levelMin: 14 },
         { move_id: QuickAttack.id, levelMin: 16 },
     ],
-    nextEvolution: null, catchRate: 40, expYield: 128, rarity: Rarity.Common,
+    nextEvolution: null, catchRate: 40, expYield: 1280, rarity: Rarity.Common,
 };
 const Clawball = {
     id: 7,
@@ -1512,7 +2166,7 @@ const Clawball = {
         { move_id: Harden.id, levelMin: 26 },
         { move_id: Cleanse.id, levelMin: 32 },
     ],
-    nextEvolution: null, catchRate: 45, expYield: 90, rarity: Rarity.Uncommon,
+    nextEvolution: null, catchRate: 45, expYield: 900, rarity: Rarity.Uncommon,
 };
 const Balt = {
     id: 8,
@@ -2319,25 +2973,25 @@ const thePlains = {
 };
 const theDarkCaves = {
     id: 1,
-    trophyRequired: 200,
+    trophyRequired: 100,
     blastIds: [Balt.id, Stagpan.id, Botte.id, Booh.id, Ghoosto.id],
     blastLevels: [2, 6]
 };
 const theMiniHell = {
     id: 2,
-    trophyRequired: 500,
+    trophyRequired: 300,
     blastIds: [Goblin.id, MiniDevil.id, DevilDare.id, Masks.id, Luckun.id, MiniHam.id, SadHam.id],
     blastLevels: [5, 9]
 };
 const theWildForest = {
     id: 3,
-    trophyRequired: 800,
+    trophyRequired: 600,
     blastIds: [Bearos.id, Treex.id, Moutmout.id, Piggy.id, Bleaub.id, Shroom.id],
     blastLevels: [8, 12]
 };
 const theWideOcean = {
     id: 4,
-    trophyRequired: 1100,
+    trophyRequired: 1000,
     blastIds: [Lantern.id, Droplet.id, Fireball.id, Mystical.id, Wormie.id, Smoky.id],
     blastLevels: [12, 15]
 };
@@ -2367,9 +3021,21 @@ const rpcLoadAllArea = function () {
 };
 const rpcSelectArea = function (ctx, logger, nk, payload) {
     const areaID = JSON.parse(payload);
-    setMetadataStat(nk, ctx.userId, "area", areaID);
-    // TODO Check si il peut
-    logger.debug("user '%s' select area '%s'", ctx.userId, areaID);
+    const trophies = getCurrencyInWallet(nk, ctx.userId, Currency.Trophies);
+    try {
+        if (trophies >= allArea[areaID].trophyRequired) {
+            setMetadataStat(nk, ctx.userId, "area", areaID);
+            logger.debug("user '%s' select area '%s'", ctx.userId, areaID);
+            return "1";
+        }
+        else {
+            logger.error('error selecting area: %s', areaID);
+            return "0";
+        }
+    }
+    catch (error) {
+        throw error;
+    }
 };
 function getRandomBlastWithAreaId(userId, nk, extraLevel, isBoss, logger) {
     try {
@@ -2738,7 +3404,7 @@ const blastTrap = {
 };
 const blastTrapOffer = {
     offer_id: 1,
-    offer: {
+    reward: {
         type: RewardType.Item,
         item: blastTrap,
     },
@@ -2752,7 +3418,7 @@ const superBlastTrap = {
 };
 const superBlastTrapOffer = {
     offer_id: 2,
-    offer: {
+    reward: {
         type: RewardType.Item,
         item: superBlastTrap,
     },
@@ -2766,7 +3432,7 @@ const hyperBlastTrap = {
 };
 const hyperBlastTrapOffer = {
     offer_id: 3,
-    offer: {
+    reward: {
         type: RewardType.Item,
         item: hyperBlastTrap,
     },
@@ -2792,14 +3458,14 @@ const rpcBuyTrapOffer = function (ctx, logger, nk, payload) {
         logger.error('error buying blast trap: %s', error);
         throw error;
     }
-    addItem(nk, logger, ctx.userId, storeOffer.offer.item);
+    addItem(nk, logger, ctx.userId, storeOffer.reward.item);
     // return playerWallet and Wallets
 };
 //#endregion
 //#region Coins Offer
 const coinsOffer1 = {
     offer_id: 4,
-    offer: {
+    reward: {
         type: RewardType.Coin,
         amount: 20000,
     },
@@ -2809,7 +3475,7 @@ const coinsOffer1 = {
 };
 const coinsOffer2 = {
     offer_id: 5,
-    offer: {
+    reward: {
         type: RewardType.Coin,
         amount: 65000,
     },
@@ -2819,7 +3485,7 @@ const coinsOffer2 = {
 };
 const coinsOffer3 = {
     offer_id: 6,
-    offer: {
+    reward: {
         type: RewardType.Coin,
         amount: 140000,
     },
@@ -2840,7 +3506,7 @@ const rpcBuyCoinOffer = function (ctx, logger, nk, payload) {
     var storeOffer = coinsOffer[indexOffer];
     try {
         nk.walletUpdate(ctx.userId, { [storeOffer.currency]: -storeOffer.price });
-        nk.walletUpdate(ctx.userId, { [Currency.Coins]: storeOffer.offer.amount });
+        nk.walletUpdate(ctx.userId, { [Currency.Coins]: storeOffer.reward.amount });
     }
     catch (error) {
         logger.error('error buying blast trap: %s', error);
@@ -2851,7 +3517,7 @@ const rpcBuyCoinOffer = function (ctx, logger, nk, payload) {
 //#region Gems Offer
 const gemsOffer1 = {
     offer_id: 7,
-    offer: {
+    reward: {
         type: RewardType.Gem,
         amount: 160,
     },
@@ -2861,7 +3527,7 @@ const gemsOffer1 = {
 };
 const gemsOffer2 = {
     offer_id: 8,
-    offer: {
+    reward: {
         type: RewardType.Gem,
         amount: 500,
     },
@@ -2871,7 +3537,7 @@ const gemsOffer2 = {
 };
 const gemsOffer3 = {
     offer_id: 9,
-    offer: {
+    reward: {
         type: RewardType.Gem,
         amount: 1200,
     },
@@ -2881,7 +3547,7 @@ const gemsOffer3 = {
 };
 const gemsOffer4 = {
     offer_id: 10,
-    offer: {
+    reward: {
         type: RewardType.Gem,
         amount: 2500,
     },
@@ -2891,7 +3557,7 @@ const gemsOffer4 = {
 };
 const gemsOffer5 = {
     offer_id: 11,
-    offer: {
+    reward: {
         type: RewardType.Gem,
         amount: 6500,
     },
@@ -2901,7 +3567,7 @@ const gemsOffer5 = {
 };
 const gemsOffer6 = {
     offer_id: 12,
-    offer: {
+    reward: {
         type: RewardType.Gem,
         amount: 14000,
     },
@@ -2926,7 +3592,7 @@ const rpcBuyGemOffer = function (ctx, logger, nk, payload) {
     try {
         // Verif
         // Achat in app
-        nk.walletUpdate(ctx.userId, { [Currency.Gems]: storeOffer.offer.amount });
+        nk.walletUpdate(ctx.userId, { [Currency.Gems]: storeOffer.reward.amount });
     }
     catch (error) {
         logger.error('error buying blast trap: %s', error);
@@ -3043,11 +3709,11 @@ function rpcBuyDailyShopOffer(context, logger, nk, payload) {
         logger.error('storageWrite error: %q', error);
         throw error;
     }
-    if (dailyShop.lastDailyShop[indexOffer].offer.blast != null) {
-        addBlast(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].offer.blast);
+    if (dailyShop.lastDailyShop[indexOffer].reward.blast != null) {
+        addBlast(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].reward.blast);
     }
-    if (dailyShop.lastDailyShop[indexOffer].offer.item != null) {
-        addItem(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].offer.item);
+    if (dailyShop.lastDailyShop[indexOffer].reward.item != null) {
+        addItem(nk, logger, context.userId, dailyShop.lastDailyShop[indexOffer].reward.item);
     }
     var result = JSON.stringify(dailyShop);
     logger.debug('Succefuly buy daily shop offer response: %q', result);
@@ -3073,7 +3739,7 @@ function getRandomOfferType() {
 function getRandomStoreOffer(nk, userId, logger) {
     let storeOffer = {
         offer_id: -1,
-        offer: {
+        reward: {
             type: RewardType.None,
         },
         price: 0,
@@ -3081,15 +3747,15 @@ function getRandomStoreOffer(nk, userId, logger) {
         isAlreadyBuyed: false,
     };
     if (Math.random() < 0.5) {
-        storeOffer.offer.type = RewardType.Blast;
-        storeOffer.offer.blast = getRandomBlastEntityInAllPlayerArea(userId, nk, false);
-        storeOffer.price = getBlastPrice(storeOffer.offer.blast);
+        storeOffer.reward.type = RewardType.Blast;
+        storeOffer.reward.blast = getRandomBlastEntityInAllPlayerArea(userId, nk, false);
+        storeOffer.price = getBlastPrice(storeOffer.reward.blast);
         storeOffer.currency = Currency.Coins;
     }
     else {
-        storeOffer.offer.type = RewardType.Item;
-        storeOffer.offer.item = getRandomItem(1 + Math.floor(Math.random() * 10));
-        storeOffer.price = getItemPrice(storeOffer.offer.item) * storeOffer.offer.item.amount;
+        storeOffer.reward.type = RewardType.Item;
+        storeOffer.reward.item = getRandomItem(1 + Math.floor(Math.random() * 10));
+        storeOffer.price = getItemPrice(storeOffer.reward.item) * storeOffer.reward.item.amount;
         storeOffer.currency = Currency.Coins;
     }
     return storeOffer;
@@ -3147,28 +3813,40 @@ const DailyQuestPermissionRead = 2;
 const DailyQuestPermissionWrite = 0;
 const DailyQuestCollectionName = "daily_quests";
 const DailyQuestStorageKey = "daily_quests_key";
-var QuestIds;
-(function (QuestIds) {
-    QuestIds["LOGIN"] = "login";
-    QuestIds["DEFEAT_BLAST"] = "defeat_blast";
-    QuestIds["CATCH_BLAST"] = "catch_blast";
-    QuestIds["WATCH_AD"] = "watch_ad";
-})(QuestIds || (QuestIds = {}));
-const QuestDefinitions = {
-    [QuestIds.LOGIN]: { goal: 1 },
-    [QuestIds.DEFEAT_BLAST]: { goal: 5 },
-    [QuestIds.CATCH_BLAST]: { goal: 2 },
-    [QuestIds.WATCH_AD]: { goal: 1 },
-};
+var QuestType;
+(function (QuestType) {
+    QuestType[QuestType["Login"] = 0] = "Login";
+    QuestType[QuestType["DefeatBlast"] = 1] = "DefeatBlast";
+    QuestType[QuestType["CatchBlast"] = 2] = "CatchBlast";
+    QuestType[QuestType["WatchAd"] = 3] = "WatchAd";
+})(QuestType || (QuestType = {}));
+const DefaultQuest = [
+    {
+        questType: QuestType.Login,
+        goal: 1,
+    },
+    {
+        questType: QuestType.DefeatBlast,
+        goal: 5,
+    },
+    {
+        questType: QuestType.CatchBlast,
+        goal: 2,
+    },
+    {
+        questType: QuestType.WatchAd,
+        goal: 1,
+    },
+];
 function generateDailyQuests() {
     return {
-        quests: Object.entries(QuestDefinitions).map(([id, def]) => ({
-            id: id,
+        quests: DefaultQuest.map((def) => ({
+            type: def.questType,
             goal: def.goal,
             progress: 0,
         })),
         lastReset: Date.now(),
-        rewardCount: 0
+        rewardCount: 0,
     };
 }
 function createDailyQuestStorageIfNeeded(userId, nk, logger) {
@@ -3221,7 +3899,7 @@ function rpcGetDailyQuests(context, logger, nk, payload) {
     logger.debug("rpcGetDailyQuests response: %q", result);
     return result;
 }
-function incrementQuest(userId, questId, amount, nk, logger) {
+function incrementQuest(userId, questType, amount, nk, logger) {
     const records = nk.storageRead([{
             collection: DailyQuestCollectionName,
             key: DailyQuestStorageKey,
@@ -3234,14 +3912,14 @@ function incrementQuest(userId, questId, amount, nk, logger) {
     const record = records[0];
     const data = record.value;
     const version = record.version;
-    const quest = data.quests.find((q) => q.id === questId);
+    const quest = data.quests.find((q) => q.type === questType);
     if (!quest) {
-        logger.debug(`incrementQuest: Quest with id=${questId} not found for userId=${userId}`);
+        logger.debug(`incrementQuest: Quest with type=${questType} not found for userId=${userId}`);
         return;
     }
     const oldProgress = quest.progress;
     quest.progress = Math.min(quest.goal, quest.progress + amount);
-    logger.debug(`incrementQuest: Updated quest '${questId}' for userId=${userId} from progress=${oldProgress} to progress=${quest.progress} (goal=${quest.goal})`);
+    logger.debug(`incrementQuest: Updated quest '${questType}' for userId=${userId} from progress=${oldProgress} to progress=${quest.progress} (goal=${quest.goal})`);
     const writeRequest = {
         collection: DailyQuestCollectionName,
         key: DailyQuestStorageKey,
@@ -3703,535 +4381,6 @@ var OpCodes;
     OpCodes[OpCodes["ERROR_SERV"] = 404] = "ERROR_SERV";
     OpCodes[OpCodes["DEBUG"] = 500] = "DEBUG";
 })(OpCodes || (OpCodes = {}));
-const healManaPerRound = 20;
-const healManaPerWait = 50;
-var BattleState;
-(function (BattleState) {
-    BattleState[BattleState["None"] = 0] = "None";
-    BattleState[BattleState["Start"] = 1] = "Start";
-    BattleState[BattleState["Waiting"] = 2] = "Waiting";
-    BattleState[BattleState["Ready"] = 3] = "Ready";
-    BattleState[BattleState["ResolveTurn"] = 4] = "ResolveTurn";
-    BattleState[BattleState["WaitingForPlayerSwap"] = 5] = "WaitingForPlayerSwap";
-    BattleState[BattleState["ReadyForPlayerSwap"] = 6] = "ReadyForPlayerSwap";
-    BattleState[BattleState["ResolvePlayerSwap"] = 7] = "ResolvePlayerSwap";
-    BattleState[BattleState["WaitForPlayerChooseOffer"] = 8] = "WaitForPlayerChooseOffer";
-    BattleState[BattleState["End"] = 9] = "End";
-})(BattleState || (BattleState = {}));
-var PlayerState;
-(function (PlayerState) {
-    PlayerState[PlayerState["None"] = 0] = "None";
-    PlayerState[PlayerState["Busy"] = 1] = "Busy";
-    PlayerState[PlayerState["Ready"] = 2] = "Ready";
-})(PlayerState || (PlayerState = {}));
-var PlayerEnum;
-(function (PlayerEnum) {
-    PlayerEnum[PlayerEnum["None"] = 0] = "None";
-    PlayerEnum[PlayerEnum["Wild"] = 1] = "Wild";
-    PlayerEnum[PlayerEnum["Player1"] = 2] = "Player1";
-    PlayerEnum[PlayerEnum["Player2"] = 3] = "Player2";
-    PlayerEnum[PlayerEnum["Player3"] = 4] = "Player3";
-    PlayerEnum[PlayerEnum["Player4"] = 5] = "Player4";
-})(PlayerEnum || (PlayerEnum = {}));
-var TurnType;
-(function (TurnType) {
-    TurnType[TurnType["None"] = 0] = "None";
-    TurnType[TurnType["Attack"] = 1] = "Attack";
-    TurnType[TurnType["Item"] = 2] = "Item";
-    TurnType[TurnType["Swap"] = 3] = "Swap";
-    TurnType[TurnType["Wait"] = 4] = "Wait";
-    TurnType[TurnType["Status"] = 5] = "Status";
-})(TurnType || (TurnType = {}));
-//#region Damage Calculation
-function calculateDamage(attackerLevel, attackerAttack, defenderDefense, attackType, defenderType, movePower, meteo, logger) {
-    const weatherModifier = calculateWeatherModifier(meteo, attackType);
-    const typeMultiplier = getTypeMultiplier(attackType, defenderType, logger);
-    const baseDamage = ((2 * attackerLevel / 5 + 2) * movePower * (attackerAttack / defenderDefense)) / 50;
-    const damage = baseDamage * typeMultiplier * weatherModifier;
-    return Math.floor(damage);
-}
-function getTypeMultiplier(moveType, defenderType, logger) {
-    switch (moveType) {
-        case Type.Fire:
-            switch (defenderType) {
-                case Type.Grass:
-                    return 2;
-                case Type.Water:
-                    return 0.5;
-                default:
-                    return 1;
-            }
-        case Type.Water:
-            switch (defenderType) {
-                case Type.Fire:
-                    return 2;
-                case Type.Grass:
-                    return 0.5;
-                default:
-                    return 1;
-            }
-        case Type.Grass:
-            switch (defenderType) {
-                case Type.Water:
-                    return 2;
-                case Type.Fire:
-                    return 0.5;
-                default:
-                    return 1;
-            }
-        case Type.Normal:
-            switch (defenderType) {
-                case Type.Light:
-                    return 0.5;
-                case Type.Dark:
-                    return 0.5;
-                default:
-                    return 1;
-            }
-        case Type.Ground:
-            switch (defenderType) {
-                case Type.Electric:
-                    return 2;
-                case Type.Fly:
-                    return 0;
-                default:
-                    return 1;
-            }
-        case Type.Fly:
-            switch (defenderType) {
-                case Type.Electric:
-                    return 0;
-                case Type.Ground:
-                    return 2;
-                default:
-                    return 1;
-            }
-        case Type.Electric:
-            switch (defenderType) {
-                case Type.Ground:
-                    return 0;
-                case Type.Fly:
-                    return 2;
-                default:
-                    return 1;
-            }
-        case Type.Light:
-            switch (defenderType) {
-                case Type.Dark:
-                    return 2;
-                case Type.Normal:
-                    return 2;
-                case Type.Light:
-                    return 0.5;
-                default:
-                    return 1;
-            }
-        case Type.Dark:
-            switch (defenderType) {
-                case Type.Light:
-                    return 2;
-                case Type.Normal:
-                    return 2;
-                case Type.Dark:
-                    return 0.5;
-                default:
-                    return 1;
-            }
-        default:
-            return 1;
-    }
-}
-function calculateWeatherModifier(weather, moveType) {
-    let modifier = 1.0;
-    switch (weather) {
-        case Meteo.Sun:
-            if (moveType === Type.Fire) {
-                modifier = 1.5;
-            }
-            break;
-        case Meteo.Rain:
-            if (moveType === Type.Water) {
-                modifier = 1.5;
-            }
-            break;
-        case Meteo.Leaves:
-            if (moveType === Type.Grass) {
-                modifier = 1.5;
-            }
-            break;
-        case Meteo.None:
-            break;
-    }
-    return modifier;
-}
-function calculateEffectWithProbability(blast, move, effectData) {
-    const statusEffectProbabilities = {
-        [MoveEffect.Burn]: 0.1,
-        [MoveEffect.Seeded]: 0.1,
-        [MoveEffect.Wet]: 0.1,
-        [MoveEffect.ManaExplosion]: 0.2,
-        [MoveEffect.HpExplosion]: 0.2,
-        [MoveEffect.ManaRestore]: 0.2,
-        [MoveEffect.HpRestore]: 0.2,
-        [MoveEffect.AttackBoost]: 0.5,
-        [MoveEffect.DefenseBoost]: 0.5,
-        [MoveEffect.SpeedBoost]: 0.5,
-        [MoveEffect.AttackReduce]: 0.5,
-        [MoveEffect.DefenseReduce]: 0.5,
-        [MoveEffect.SpeedReduce]: 0.5,
-        [MoveEffect.Cleanse]: 0.5,
-    };
-    const effectProbability = statusEffectProbabilities[effectData.effect];
-    if (Math.random() < effectProbability) {
-        return { blast: applyEffect(blast, move, effectData), moveEffect: effectData };
-    }
-    return { blast, moveEffect: { effect: MoveEffect.None, effectModifier: 0, effectTarget: Target.None } };
-}
-function applyEffect(blast, move, effectData) {
-    var isStatusMove = move.attackType === AttackType.Status;
-    switch (effectData.effect) {
-        case MoveEffect.Burn:
-            blast.status = Status.Burn;
-            break;
-        case MoveEffect.Seeded:
-            blast.status = Status.Seeded;
-            break;
-        case MoveEffect.Wet:
-            blast.status = Status.Wet;
-            break;
-        case MoveEffect.ManaExplosion:
-            const manaDmg = Math.floor(blast.maxMana / 2);
-            blast.hp = Math.max(0, blast.hp - manaDmg);
-            blast.mana = Math.floor(blast.mana / 2);
-            break;
-        case MoveEffect.HpExplosion:
-            const hpCost = Math.floor(blast.maxHp / 3);
-            blast.hp = Math.max(0, blast.hp - hpCost);
-            break;
-        case MoveEffect.ManaRestore:
-            blast.mana = Math.min(blast.maxMana, blast.mana + move.power);
-            break;
-        case MoveEffect.HpRestore:
-            blast.hp = Math.min(blast.maxHp, blast.hp + move.power);
-            break;
-        case MoveEffect.AttackBoost:
-            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Attack, isStatusMove ? effectData.effectModifier : 1);
-            break;
-        case MoveEffect.DefenseBoost:
-            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Defense, isStatusMove ? effectData.effectModifier : 1);
-            break;
-        case MoveEffect.SpeedBoost:
-            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Speed, isStatusMove ? effectData.effectModifier : 1);
-            break;
-        case MoveEffect.AttackReduce:
-            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Attack, isStatusMove ? -effectData.effectModifier : -1);
-            break;
-        case MoveEffect.DefenseReduce:
-            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Defense, isStatusMove ? -effectData.effectModifier : -1);
-            break;
-        case MoveEffect.SpeedReduce:
-            blast.modifiers = updateStatModifier(blast.modifiers, Stats.Speed, isStatusMove ? -effectData.effectModifier : -1);
-            break;
-        case MoveEffect.Cleanse:
-            blast.status = Status.None;
-            break;
-    }
-    return blast;
-}
-function getStatModifier(stat, modifiers) {
-    var modifier = modifiers.find(m => m.stats === stat);
-    if (!modifier)
-        return 1;
-    const amount = modifier.amount;
-    if (amount > 0) {
-        if (amount === 1)
-            return 1.5;
-        if (amount === 2)
-            return 2;
-        return 3;
-    }
-    else if (amount < 0) {
-        if (amount === -1)
-            return 0.8;
-        if (amount === -2)
-            return 0.6;
-        return 0.2;
-    }
-    return 1;
-}
-function updateStatModifier(mods, stat, delta) {
-    const index = mods.findIndex((m) => m.stats === stat);
-    if (index >= 0) {
-        mods[index].amount += delta;
-        if (mods[index].amount <= 0)
-            mods.splice(index, 1);
-    }
-    else if (delta > 0) {
-        mods.push({ stats: stat, amount: delta });
-    }
-    return mods;
-}
-function applyStatusEffectAtEndOfTurn(blast, otherBlast) {
-    switch (blast.status) {
-        case Status.Burn:
-            blast.hp = Math.max(0, blast.hp - Math.floor(blast.maxHp / 16));
-            break;
-        case Status.Seeded:
-            const healAmount = Math.floor(blast.maxHp / 16);
-            blast.hp = Math.max(0, blast.hp - healAmount);
-            otherBlast.hp = Math.min(otherBlast.maxHp, otherBlast.hp + healAmount);
-            break;
-        case Status.Wet:
-            blast.mana = Math.max(0, blast.mana - Math.floor(blast.maxMana / 32));
-            break;
-        default:
-            break;
-    }
-    return { blast, otherBlast };
-}
-function addPlatformType(p_platform, newType) {
-    if (p_platform.length < 3) {
-        p_platform.push(newType);
-    }
-    else {
-        p_platform.shift();
-        p_platform.push(newType);
-    }
-    return p_platform;
-}
-function getAmountOfPlatformTypeByType(p_platform, typeToCount) {
-    return p_platform.filter(type => type === typeToCount).length;
-}
-function removePlatformTypeByType(p_platform, typeToRemove, numberToRemove) {
-    let removedCount = 0;
-    for (let i = p_platform.length - 1; i >= 0 && removedCount < numberToRemove; i--) {
-        if (p_platform[i] === typeToRemove) {
-            p_platform.splice(i, 1);
-            removedCount++;
-        }
-    }
-    return p_platform;
-}
-//#region Health and Mana and Status
-function isAllBlastDead(allPlayerBlasts) {
-    return allPlayerBlasts.every((blast) => blast.hp === 0);
-}
-function isBlastAlive(blast) {
-    return blast.hp > 0;
-}
-function getFirstAliveBlastIndex(allPlayerBlasts) {
-    return allPlayerBlasts.findIndex(blast => isBlastAlive(blast));
-}
-function calculateManaRecovery(maxMana, currentMana, useWait = false) {
-    const normalRecovery = Math.floor(maxMana * 0.2);
-    const waitRecovery = Math.floor(maxMana * 0.5);
-    let recoveredMana = currentMana + (useWait ? waitRecovery : normalRecovery);
-    if (recoveredMana > maxMana) {
-        recoveredMana = maxMana;
-    }
-    return recoveredMana;
-}
-function healHealthBlast(blast, amount) {
-    blast.hp += amount;
-    if (blast.hp > blast.maxHp)
-        blast.hp = blast.maxHp;
-    return blast;
-}
-function healManaBlast(blast, amount) {
-    blast.mana += amount;
-    if (blast.mana > blast.maxMana)
-        blast.mana = blast.maxMana;
-    return blast;
-}
-function healStatusBlast(blast, status) {
-    if (blast.status == status || status == Status.All)
-        blast.status = Status.None;
-    return blast;
-}
-// #region round logic
-function getFasterBlast(blast1, blast2) {
-    if (blast1.speed === blast2.speed) {
-        return Math.random() < 0.5;
-    }
-    else {
-        return blast1.speed > blast2.speed;
-    }
-}
-function getRandomMeteo() {
-    const values = Object.values(Meteo).filter(value => typeof value === "number");
-    return randomElement(values);
-}
-function getRandomUsableMove(allMoves, currentMana, currentPlatformTypes) {
-    const usableMoves = [];
-    for (const move of allMoves) {
-        switch (move.attackType) {
-            case AttackType.Normal:
-            case AttackType.Status:
-                if (currentMana < move.cost)
-                    continue;
-                break;
-            case AttackType.Special: {
-                const energyCount = getAmountOfPlatformTypeByType(currentPlatformTypes, move.type);
-                if (energyCount < move.cost)
-                    continue;
-                break;
-            }
-        }
-        usableMoves.push(move);
-    }
-    if (usableMoves.length === 0) {
-        return -1;
-    }
-    const randomIndex = Math.floor(Math.random() * usableMoves.length);
-    return allMoves.indexOf(usableMoves[randomIndex]);
-}
-function compareActionPriorities(p1ActionType, p2ActionType) {
-    const p1Priority = getActionPriority(p1ActionType);
-    const p2Priority = getActionPriority(p2ActionType);
-    return p1Priority >= p2Priority;
-}
-function getActionPriority(turnType) {
-    switch (turnType) {
-        case TurnType.Attack:
-            return 2;
-        case TurnType.Swap:
-            return 4;
-        case TurnType.Item:
-            return 3;
-        case TurnType.Wait:
-            return 1;
-        default:
-            return 0;
-    }
-}
-function performAttackSequence(state, dispatcher, nk, logger) {
-    const p1Blast = state.p1Blasts[state.p1Index];
-    const p2Blast = state.p2Blasts[state.p2Index];
-    const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
-    const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
-    let p1First = false;
-    if (p1Move.priority === p2Move.priority) {
-        p1First = getFasterBlast(p1Blast, p2Blast);
-    }
-    else {
-        p1First = p1Move.priority > p2Move.priority;
-    }
-    state.turnStateData.p1TurnPriority = p1First;
-    if (p1First) {
-        executePlayerAttack(true, state, logger, dispatcher);
-        logger.debug("P1 Attack executed");
-        if (state.battleState === BattleState.ResolveTurn) {
-            executePlayerAttack(false, state, logger, dispatcher);
-            logger.debug("P2 Attack executed");
-        }
-    }
-    else {
-        executePlayerAttack(false, state, logger, dispatcher);
-        logger.debug("P2 Attack executed");
-        if (state.battleState === BattleState.ResolveTurn) {
-            executePlayerAttack(true, state, logger, dispatcher);
-            logger.debug("P1 Attack executed");
-        }
-    }
-    return state;
-}
-function executePlayerAttack(isP1, state, logger, dispatcher) {
-    const p1Blast = state.p1Blasts[state.p1Index];
-    const p2Blast = state.p2Blasts[state.p2Index];
-    const p1Move = getMoveById(p1Blast.activeMoveset[state.turnStateData.p1TurnData.index]);
-    const p2Move = getMoveById(p2Blast.activeMoveset[state.turnStateData.p2TurnData.index]);
-    const move = isP1 ? p1Move : p2Move;
-    const attacker = isP1 ? p1Blast : p2Blast;
-    const defender = isP1 ? p2Blast : p1Blast;
-    const attackerPlatform = isP1 ? state.player1Platform : state.player2Platform;
-    const setAttacker = (b) => {
-        if (isP1)
-            state.p1Blasts[state.p1Index] = b;
-        else
-            state.p2Blasts[state.p2Index] = b;
-    };
-    const setDefender = (b) => {
-        if (isP1)
-            state.p2Blasts[state.p2Index] = b;
-        else
-            state.p1Blasts[state.p1Index] = b;
-    };
-    const turnData = isP1 ? state.turnStateData.p1TurnData : state.turnStateData.p2TurnData;
-    ExecuteAttack({
-        move,
-        attacker,
-        defender,
-        attackerPlatforms: attackerPlatform,
-        setAttacker,
-        setDefender,
-        getTurnData: () => turnData,
-        setMoveDamage: dmg => turnData.moveDamage = dmg,
-        setMoveEffect: eff => turnData.moveEffects = eff,
-        meteo: state.meteo,
-        dispatcher
-    }, logger);
-    checkIfMatchContinue(state);
-    return state;
-}
-function checkIfMatchContinue(state) {
-    const playerBlast = state.p1Blasts[state.p1Index];
-    const opponentBlast = state.p2Blasts[state.p2Index];
-    const opponentAlive = isBlastAlive(opponentBlast);
-    const playerAlive = isBlastAlive(playerBlast);
-    const allPlayerDead = isAllBlastDead(state.p1Blasts);
-    const allOpponentDead = isAllBlastDead(state.p2Blasts);
-    if (allOpponentDead) {
-        state.battleState = BattleState.End;
-    }
-    else if (!opponentAlive) {
-        state.battleState = BattleState.WaitingForPlayerSwap;
-    }
-    else if (allPlayerDead) {
-        state.battleState = BattleState.End;
-    }
-    else if (!playerAlive) {
-        state.battleState = BattleState.WaitingForPlayerSwap;
-    }
-    return state;
-}
-function trySwapBlast(currentIndex, turnData, blasts, updateIndex, state, dispatcher) {
-    const targetIndex = clamp(turnData.index, 0, blasts.length - 1);
-    if (currentIndex === targetIndex) {
-        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
-        return true;
-    }
-    if (!isBlastAlive(blasts[targetIndex])) {
-        ErrorFunc(state, "Cannot change actual blast with dead blast in Ready", dispatcher, BattleState.Ready);
-        return true;
-    }
-    updateIndex(targetIndex);
-    return false;
-}
-// #region Others
-function addExpOnBlastInGame(nk, logger, playerId, currentPlayerBlast, enemyBlast) {
-    let expToAdd = calculateExperienceGain(getBlastDataById(currentPlayerBlast.data_id).expYield, calculateLevelFromExperience(enemyBlast.exp), calculateLevelFromExperience(currentPlayerBlast.exp));
-    addExpOnBlast(nk, logger, playerId, currentPlayerBlast.uuid, expToAdd);
-}
-function calculateCaptureProbability(currentHP, maxHP, catchRate, trapBonus, statusBonus) {
-    const hpFactor = (3 * maxHP - 2 * currentHP) / (3 * maxHP);
-    const baseProbability = catchRate * hpFactor * trapBonus * statusBonus;
-    const captureProbability = Math.min(Math.max(baseProbability, 0), 1);
-    return captureProbability;
-}
-function isBlastCaptured(currentHP, maxHP, catchRate, trapBonus, statusBonus) {
-    const captureProbability = calculateCaptureProbability(currentHP, maxHP, catchRate, trapBonus, statusBonus) * 100;
-    const randomValue = Math.random() * 100;
-    return randomValue <= captureProbability;
-}
-function isShiny(probability = 1 / 1024) {
-    return Math.random() < probability;
-}
-function EndLoopDebug(logger, state) {
-    var _a, _b, _c, _d;
-    logger.debug('______________ END LOOP BATTLE ______________');
-    logger.debug('Wild blast HP : %h, Mana : %m', (_a = state.p2Blasts) === null || _a === void 0 ? void 0 : _a[state.p2Index].hp, (_b = state.p2Blasts) === null || _b === void 0 ? void 0 : _b[state.p2Index].mana);
-    logger.debug('Player blast HP : %h, Mana : %m', (_c = state.p1Blasts[state.p1Index]) === null || _c === void 0 ? void 0 : _c.hp, (_d = state.p1Blasts[state.p1Index]) === null || _d === void 0 ? void 0 : _d.mana);
-}
 // region Setup 
 function rpcCreatePvEBattle(context, logger, nk) {
     var matchId = nk.matchCreate('PvEBattle', {});
@@ -4242,6 +4391,7 @@ const PvEinitMatch = function (ctx, logger, nk, params) {
         emptyTicks: 0,
         presences: {},
         battleState: BattleState.Start,
+        winner: WinnerEnum.None,
         player1State: PlayerState.Busy,
         player1Id: "",
         player2State: PlayerState.Busy,
@@ -4287,7 +4437,7 @@ const PvEinitMatch = function (ctx, logger, nk, params) {
     };
     return {
         state: PvEBattleData,
-        tickRate: 2,
+        tickRate: 5,
         label: ''
     };
 };
@@ -4381,12 +4531,23 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                     moveDamage: 0,
                     moveEffects: [],
                 };
-                state.turnStateData.p2TurnData = {
-                    type: TurnType.None,
-                    index: getRandomUsableMove(getMovesByIds(state.p2Blasts[state.p2Index].activeMoveset), state.p2Blasts[state.p2Index].mana, state.player2Platform),
-                    moveDamage: 0,
-                    moveEffects: [],
-                };
+                let p2Index = getRandomUsableMove(getMovesByIds(state.p2Blasts[state.p2Index].activeMoveset), state.p2Blasts[state.p2Index].mana, state.player2Platform);
+                if (p2Index == -1) {
+                    state.turnStateData.p2TurnData = {
+                        type: TurnType.Wait,
+                        index: 0,
+                        moveDamage: 0,
+                        moveEffects: [],
+                    };
+                }
+                else {
+                    state.turnStateData.p2TurnData = {
+                        type: TurnType.Attack,
+                        index: p2Index,
+                        moveDamage: 0,
+                        moveEffects: [],
+                    };
+                }
                 state.turnStateData.catched = false;
                 logger.debug('______________ EVERYONE"S READY ______________');
             }
@@ -4411,7 +4572,12 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 actionType === TurnType.Item ? (state.turnStateData.p1TurnData.itemUse = parsed.data) : (state.turnStateData.p1TurnData.index = (_a = parsed.data) !== null && _a !== void 0 ? _a : 0);
                 if (message.opCode == OpCodes.PLAYER_LEAVE) {
                     PvEPlayerLeave(nk, state, logger);
-                    dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
+                    const endDataWinner = {
+                        win: true,
+                        trophyRewards: 0,
+                    };
+                    dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataWinner));
+                    return null;
                 }
             }
             const p1Played = state.turnStateData.p1TurnData.type !== TurnType.None;
@@ -4426,16 +4592,21 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 // region Attack
                 case TurnType.Attack:
                     state.turnStateData.p1TurnData.index = clamp(state.turnStateData.p1TurnData.index, 0, 3);
-                    let move = getMoveById(state.p1Blasts[state.p1Index].activeMoveset[state.turnStateData.p1TurnData.index]);
-                    if (move == null) {
+                    let p1Move = getMoveById(state.p1Blasts[state.p1Index].activeMoveset[state.turnStateData.p1TurnData.index]);
+                    let p2Move = getMoveById(state.p2Blasts[state.p2Index].activeMoveset[state.turnStateData.p2TurnData.index]);
+                    if (p1Move == null) {
                         ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready);
+                        break;
+                    }
+                    if (p2Move == null && state.turnStateData.p2TurnData.type == TurnType.Attack) {
+                        ErrorFunc(state, "Player 2 move null", dispatcher, BattleState.Ready);
                         break;
                     }
                     let moveIndex = state.turnStateData.p2TurnData.index;
                     if (moveIndex === -1) {
-                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p2Blasts[state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
-                        executePlayerAttack(true, state, logger, dispatcher);
+                        executePlayerAttack(true, state, logger, nk, dispatcher);
                     }
                     else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
@@ -4470,7 +4641,7 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                             break;
                         case ITEM_BEHAVIOUR.Catch:
                             var wildBlastCaptured = false;
-                            wildBlastCaptured = isBlastCaptured(state.p2Blasts[state.p2Index].hp, state.p2Blasts[state.p2Index].maxHp, getBlastDataById(state.p2Blasts[state.p2Index].data_id).catchRate, itemData.catchRate, 1); // TODO Get status bonus
+                            wildBlastCaptured = isBlastCaptured(state.p2Blasts[state.p2Index].hp, getMaxHp(state.p2Blasts[state.p2Index]), getBlastDataById(state.p2Blasts[state.p2Index].data_id).catchRate, itemData.catchRate, 1); // TODO Get status bonus
                             if (wildBlastCaptured) {
                                 logger.debug('Wild blast Captured !', wildBlastCaptured);
                                 state.battleState = BattleState.End;
@@ -4481,12 +4652,12 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                             break;
                     }
                     if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p2Blasts[state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     }
                     else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, dispatcher);
+                        executePlayerAttack(false, state, logger, nk, dispatcher);
                     }
                     break;
                 // region Player Change
@@ -4502,24 +4673,24 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                     }
                     state.p1Index = msgChangeBlast;
                     if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p2Blasts[state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     }
                     else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, dispatcher);
+                        executePlayerAttack(false, state, logger, nk, dispatcher);
                     }
                     break;
                 // region Player Wait
                 case TurnType.Wait:
-                    state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, true);
+                    state.p1Blasts[state.p1Index].mana = calculateManaRecovery(getMaxMana(state.p1Blasts[state.p1Index]), state.p1Blasts[state.p1Index].mana, true);
                     if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                        state.p2Blasts[state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p2Blasts[state.p2Index].mana, true);
                         state.turnStateData.p2TurnData.type = TurnType.Wait;
                     }
                     else {
                         state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, dispatcher);
+                        executePlayerAttack(false, state, logger, nk, dispatcher);
                     }
                     break;
             }
@@ -4528,9 +4699,9 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             ({ blast: state.p2Blasts[state.p2Index], otherBlast: state.p1Blasts[state.p1Index] } = applyStatusEffectAtEndOfTurn(state.p2Blasts[state.p2Index], state.p1Blasts[state.p1Index]));
             checkIfMatchContinue(state);
             if (isBlastAlive(state.p2Blasts[state.p2Index]))
-                state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, false);
+                state.p2Blasts[state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p2Blasts[state.p2Index].mana, false);
             if (isBlastAlive(state.p1Blasts[state.p1Index]))
-                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, false);
+                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p1Blasts[state.p1Index].mana, false);
             if (state.battleState == BattleState.End) {
                 dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
             }
@@ -4649,21 +4820,16 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
             break;
         // region END BATTLE
         case BattleState.End:
-            const p1_blast = state.p1Blasts[state.p1Index];
-            const wildBlast = state.p2Blasts;
-            const allPlayerBlastFainted = isAllBlastDead(state.p1Blasts);
-            const wildAlive = isBlastAlive(wildBlast[state.p2Index]);
-            if (wildAlive == false || state.turnStateData.catched) {
+            if (state.winner == WinnerEnum.Player1 || state.turnStateData.catched) {
                 state.indexProgression++;
-                addExpOnBlastInGame(nk, logger, state.player1Id, p1_blast, wildBlast[state.p2Index]);
                 if (state.turnStateData.catched) {
                     state.blastCatched++;
-                    incrementQuest(state.player1Id, QuestIds.CATCH_BLAST, 1, nk, logger);
+                    incrementQuest(state.player1Id, QuestType.CatchBlast, 1, nk, logger);
                     addBlast(nk, logger, state.player1Id, state.p2Blasts[state.p2Index]);
                 }
                 else {
                     state.blastDefeated++;
-                    incrementQuest(state.player1Id, QuestIds.DEFEAT_BLAST, 1, nk, logger);
+                    incrementQuest(state.player1Id, QuestType.DefeatBlast, 1, nk, logger);
                 }
                 if (state.indexProgression % 5 == 0 && state.indexProgression % 10 != 0) {
                     let items = {
@@ -4697,7 +4863,7 @@ const PvEmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 }
                 EndLoopDebug(logger, state);
             }
-            else if (allPlayerBlastFainted) {
+            else if (state.winner == WinnerEnum.Player2) {
                 dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false));
                 PvEPlayerLeave(nk, state, logger);
                 return null;
@@ -4753,90 +4919,6 @@ function PvEPlayerLeave(nk, state, logger) {
 function GetNewWildBlast(state, nk, logger) {
     return getRandomBlastWithAreaId(state.player1Id, nk, Math.floor(state.indexProgression / 5), state.indexProgression % 10 == 0, logger);
 }
-function ErrorFunc(state, error, dispatcher, currentBattleState) {
-    state.battleState = currentBattleState;
-    state.player1State = PlayerState.Ready;
-    dispatcher.broadcastMessage(OpCodes.ERROR_SERV, JSON.stringify(error));
-    return { state };
-}
-function ConnectedPlayers(s) {
-    let count = 0;
-    for (const p of Object.keys(s.presences)) {
-        if (s.presences[p] !== null) {
-            count++;
-        }
-    }
-    return count;
-}
-//#region  Attack Logic
-function ApplyBlastAttack(attacker, defender, move, meteo, logger) {
-    let damage = calculateDamage(calculateLevelFromExperience(attacker.exp), attacker.attack * getStatModifier(Stats.Attack, attacker.modifiers), defender.defense * getStatModifier(Stats.Defense, defender.modifiers), move.type, getBlastDataById(defender.data_id).type, move.power, meteo, logger);
-    defender.hp = clamp(defender.hp - damage, 0, Number.POSITIVE_INFINITY);
-    return damage;
-}
-function ExecuteAttack(ctx, logger) {
-    // Gestion mana/plateforme
-    switch (ctx.move.attackType) {
-        case AttackType.Normal:
-        case AttackType.Status:
-            if (ctx.attacker.mana < ctx.move.cost)
-                return;
-            ctx.attacker.mana = clamp(ctx.attacker.mana - ctx.move.cost, 0, Number.POSITIVE_INFINITY);
-            ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
-            if (calculateWeatherModifier(ctx.meteo, ctx.move.type) > 1) {
-                ctx.attackerPlatforms = addPlatformType(ctx.attackerPlatforms, ctx.move.type);
-            }
-            break;
-        case AttackType.Special: {
-            const platformCount = getAmountOfPlatformTypeByType(ctx.attackerPlatforms, ctx.move.type);
-            if (platformCount < ctx.move.cost)
-                return;
-            ctx.attackerPlatforms = removePlatformTypeByType(ctx.attackerPlatforms, ctx.move.type, ctx.move.cost);
-            break;
-        }
-    }
-    // Application des effets
-    const effects = ApplyMoveEffects(ctx.move, () => ctx.defender, ctx.setDefender, () => ctx.attacker, ctx.setAttacker);
-    ctx.setMoveEffect(effects);
-    let damage = 0;
-    // Application des dégâts
-    if (ctx.move.target === Target.Opponent) {
-        damage = ApplyBlastAttack(ctx.attacker, ctx.defender, ctx.move, ctx.meteo, logger);
-        ctx.setMoveDamage(damage);
-    }
-    return;
-}
-function ApplyMoveEffects(move, getTargetBlast, setTargetBlast, getAttacker, setAttacker) {
-    if (!move.effects || move.effects.length === 0)
-        return [];
-    const effectsThisTurn = [];
-    for (const effectData of move.effects) {
-        if (effectData.effect === MoveEffect.None)
-            continue;
-        let getTarget;
-        let setTarget;
-        if (effectData.effectTarget === Target.Self) {
-            getTarget = getAttacker;
-            setTarget = setAttacker;
-        }
-        else {
-            getTarget = getTargetBlast;
-            setTarget = setTargetBlast;
-        }
-        if (move.attackType === AttackType.Special || move.attackType === AttackType.Status) {
-            const updated = applyEffect(getTarget(), move, effectData);
-            setTarget(updated);
-            effectsThisTurn.push(effectData);
-        }
-        else {
-            const result = calculateEffectWithProbability(getTarget(), move, effectData);
-            setTarget(result.blast);
-            effectsThisTurn.push(result.moveEffect);
-        }
-    }
-    return effectsThisTurn;
-}
-//#endregion
 // region Offer Turn Logic
 function getRandomReward(nk, state, logger) {
     let reward = {
@@ -4885,6 +4967,7 @@ const PvPinitMatch = function (ctx, logger, nk, params) {
         emptyTicks: 0,
         presences: {},
         battleState: BattleState.None,
+        winner: WinnerEnum.None,
         player1State: PlayerState.Busy,
         player1Id: "",
         player2State: PlayerState.Busy,
@@ -4916,7 +4999,7 @@ const PvPinitMatch = function (ctx, logger, nk, params) {
     };
     return {
         state: PvPBattleData,
-        tickRate: 2,
+        tickRate: 10,
         label: ''
     };
 };
@@ -4945,28 +5028,20 @@ const PvPmatchJoin = function (ctx, logger, nk, dispatcher, tick, state, presenc
     return { state };
 };
 const PvPmatchLeave = function (ctx, logger, nk, dispatcher, tick, state, presences) {
-    if (ConnectedPlayers(state) > 1) {
-        for (let presence of presences) {
-            logger.info("Player: %s left match: %s.", presence.userId, ctx.matchId);
-            const isP1 = presence.userId === state.player1Id;
-            const opponentId = isP1 ? state.player2Id : state.player1Id;
-            const opponentPresence = state.presences[opponentId];
-            PvPPlayerLeave(!isP1, nk, state, logger);
-            if (opponentPresence) {
-                dispatcher.broadcastMessage(OpCodes.OPPONENT_LEAVE, JSON.stringify(true), [opponentPresence]);
-            }
-            state.presences[presence.userId] = null;
-        }
-        for (let userID in state.presences) {
-            if (state.presences[userID] === null) {
-                delete state.presences[userID];
-            }
-        }
-    }
-    else {
-        logger.info("Last player left, match will be closed.");
+    for (let presence of presences) {
+        PlayerActionLeave(presence.userId === state.player2Id, nk, state, logger, dispatcher, OpCodes.OPPONENT_LEAVE);
         return null;
     }
+    for (let presence of presences) {
+        state.presences[presence.userId] = null;
+    }
+    for (let userID in state.presences) {
+        if (state.presences[userID] === null) {
+            delete state.presences[userID];
+        }
+    }
+    if (ConnectedPlayers(state) == 0 || ConnectedPlayers(state) == 1)
+        return null;
     logger.info("Player connected amount : %s", ConnectedPlayers(state));
     return { state };
 };
@@ -5052,15 +5127,19 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 const userId = message.sender.userId;
                 const parsed = JSON.parse(nk.binaryToString(message.data));
                 const action = {
-                    type: parsed.type,
+                    type: parseEnum(parsed.type.toString(), TurnType),
                     data: (_a = parsed.data) !== null && _a !== void 0 ? _a : 0,
                 };
+                if (action.type == TurnType.Leave) {
+                    PlayerActionLeave(userId === state.player1Id, nk, state, logger, dispatcher, OpCodes.MATCH_END);
+                    return null;
+                }
                 if (userId === state.player1Id) {
-                    state.turnStateData.p1TurnData.type = parseEnum(action.type.toString(), TurnType);
+                    state.turnStateData.p1TurnData.type = action.type;
                     state.turnStateData.p1TurnData.index = action.data;
                 }
                 if (userId === state.player2Id) {
-                    state.turnStateData.p2TurnData.type = parseEnum(action.type.toString(), TurnType);
+                    state.turnStateData.p2TurnData.type = action.type;
                     state.turnStateData.p2TurnData.index = action.data;
                 }
             }
@@ -5122,25 +5201,25 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
                 performAttackSequence(state, dispatcher, nk, logger);
             }
             else if (p1.type === TurnType.Attack) {
-                executePlayerAttack(true, state, logger, dispatcher);
+                executePlayerAttack(true, state, logger, nk, dispatcher);
             }
             else if (p2.type === TurnType.Attack) {
-                executePlayerAttack(false, state, logger, dispatcher);
+                executePlayerAttack(false, state, logger, nk, dispatcher);
             }
             if (p1.type === TurnType.Wait) {
-                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, true);
+                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(getMaxMana(state.p1Blasts[state.p1Index]), state.p1Blasts[state.p1Index].mana, true);
             }
             if (p2.type === TurnType.Wait) {
-                state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, true);
+                state.p2Blasts[state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p2Blasts[state.p2Index].mana, true);
             }
             ({ blast: state.p1Blasts[state.p1Index], otherBlast: state.p2Blasts[state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index], state.p2Blasts[state.p2Index]));
             ({ blast: state.p2Blasts[state.p2Index], otherBlast: state.p1Blasts[state.p1Index] } = applyStatusEffectAtEndOfTurn(state.p2Blasts[state.p2Index], state.p1Blasts[state.p1Index]));
             checkIfMatchContinue(state);
             if (isBlastAlive(state.p2Blasts[state.p2Index])) {
-                state.p2Blasts[state.p2Index].mana = calculateManaRecovery(state.p2Blasts[state.p2Index].maxMana, state.p2Blasts[state.p2Index].mana, false);
+                state.p2Blasts[state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts[state.p2Index]), state.p2Blasts[state.p2Index].mana, false);
             }
             if (isBlastAlive(state.p1Blasts[state.p1Index])) {
-                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(state.p1Blasts[state.p1Index].maxMana, state.p1Blasts[state.p1Index].mana, false);
+                state.p1Blasts[state.p1Index].mana = calculateManaRecovery(getMaxMana(state.p1Blasts[state.p1Index]), state.p1Blasts[state.p1Index].mana, false);
             }
             SendTurnState(dispatcher, state, OpCodes.NEW_BATTLE_TURN);
             if (state.battleState !== BattleState.End && state.battleState !== BattleState.WaitingForPlayerSwap) {
@@ -5261,29 +5340,20 @@ const PvPmatchLoop = function (ctx, logger, nk, dispatcher, tick, state, message
         }
         case BattleState.End:
             logger.debug('______________ START END ______________');
-            const allP1BlastFainted = isAllBlastDead(state.p1Blasts);
-            const allP2BlastFainted = isAllBlastDead(state.p2Blasts);
-            if (allP1BlastFainted && allP2BlastFainted) {
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [
+            let endData = {
+                win: true,
+                trophyRewards: 0
+            };
+            if (state.winner == WinnerEnum.Tie) {
+                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endData), [
                     state.presences[state.player1Id],
                     state.presences[state.player2Id]
                 ]);
-                return null;
             }
-            if (allP1BlastFainted) {
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player1Id]]);
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player2Id]]);
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
-                return null;
+            else if (state.winner === WinnerEnum.Player1 || state.winner === WinnerEnum.Player2) {
+                PlayerActionLeave(state.winner === WinnerEnum.Player1, nk, state, logger, dispatcher, OpCodes.MATCH_END);
             }
-            if (allP2BlastFainted) {
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true), [state.presences[state.player1Id]]);
-                dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(false), [state.presences[state.player2Id]]);
-                updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
-                updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
-                return null;
-            }
+            return null;
     }
     if (ConnectedPlayers(state) === 0) {
         logger.debug('Running empty ticks: %d', state.emptyTicks);
@@ -5309,6 +5379,37 @@ const PvPmatchTerminate = function (ctx, logger, nk, dispatcher, tick, state, gr
         state
     };
 };
+function PlayerActionLeave(p1Win, nk, state, logger, dispatcher, opCodes) {
+    PvPGetRewards(p1Win, nk, state, logger);
+    const endDataWinner = {
+        win: true,
+        trophyRewards: 20,
+    };
+    const endDataLoser = {
+        win: false,
+        trophyRewards: -20,
+    };
+    if (p1Win) {
+        const p2Presence = state.presences[state.player2Id];
+        const p1Presence = state.presences[state.player1Id];
+        if (p2Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataLoser), [p2Presence]);
+        }
+        if (p1Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataWinner), [p1Presence]);
+        }
+    }
+    else {
+        const p1Presence = state.presences[state.player1Id];
+        const p2Presence = state.presences[state.player2Id];
+        if (p1Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataLoser), [p1Presence]);
+        }
+        if (p2Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataWinner), [p2Presence]);
+        }
+    }
+}
 function SendTurnState(dispatcher, state, OpCodes) {
     dispatcher.broadcastMessage(OpCodes, JSON.stringify(state.turnStateData), [state.presences[state.player1Id]]);
     const reversedTurnStateData = {
@@ -5318,29 +5419,28 @@ function SendTurnState(dispatcher, state, OpCodes) {
     };
     dispatcher.broadcastMessage(OpCodes, JSON.stringify(reversedTurnStateData), [state.presences[state.player2Id]]);
 }
-function PvPPlayerLeave(p1Win, nk, state, logger) {
-    if (p1Win) {
-        incrementMetadataStat(nk, state.player1Id, "win", 1);
-        incrementMetadataStat(nk, state.player2Id, "loose", 1);
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, 20, logger);
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, -20, logger);
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 1000, logger);
-    }
-    else {
-        incrementMetadataStat(nk, state.player2Id, "win", 1);
-        incrementMetadataStat(nk, state.player1Id, "loose", 1);
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Trophies, 20, logger);
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Trophies, -20, logger);
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 1000, logger);
-    }
-    let bonusP1Ads = getMetadataStat(nk, state.player1Id, "pvpBattleButtonAds");
-    let bonusP2Ads = getMetadataStat(nk, state.player2Id, "pvpBattleButtonAds");
-    if (bonusP1Ads) {
-        updateWalletWithCurrency(nk, state.player1Id, Currency.Coins, 500, logger);
-        setMetadataStat(nk, state.player1Id, "pvpBattleButtonAds", false);
-    }
-    if (bonusP2Ads) {
-        updateWalletWithCurrency(nk, state.player2Id, Currency.Coins, 500, logger);
-        setMetadataStat(nk, state.player2Id, "pvpBattleButtonAds", false);
-    }
+function PvPGetRewards(p1Win, nk, state, logger) {
+    const player1Id = state.player1Id;
+    const player2Id = state.player2Id;
+    const p1Coins = countDefeatedBlasts(state.p2Blasts) * 200;
+    const p2Coins = countDefeatedBlasts(state.p1Blasts) * 200;
+    let winnerCoins = p1Win ? p1Coins : p2Coins;
+    let loserCoins = p1Win ? p2Coins : p1Coins;
+    winnerCoins += 2000;
+    const winnerId = p1Win ? player1Id : player2Id;
+    const loserId = p1Win ? player2Id : player1Id;
+    incrementMetadataStat(nk, winnerId, "win", 1);
+    incrementMetadataStat(nk, loserId, "loose", 1);
+    updateWalletWithCurrency(nk, winnerId, Currency.Trophies, 20, logger);
+    updateWalletWithCurrency(nk, loserId, Currency.Trophies, -20, logger);
+    updateWalletWithCurrency(nk, winnerId, Currency.Coins, winnerCoins, logger);
+    updateWalletWithCurrency(nk, loserId, Currency.Coins, loserCoins, logger);
+    const checkAdBonus = (playerId, coinReward) => {
+        if (getMetadataStat(nk, playerId, "pvpBattleButtonAds")) {
+            updateWalletWithCurrency(nk, playerId, Currency.Coins, coinReward / 2, logger);
+            setMetadataStat(nk, playerId, "pvpBattleButtonAds", false);
+        }
+    };
+    checkAdBonus(winnerId, winnerCoins);
+    checkAdBonus(loserId, loserCoins);
 }

@@ -50,5 +50,5 @@ function rpcWatchQuestAds(context: nkruntime.Context, logger: nkruntime.Logger, 
         throw Error('No user ID in context');
     }
 
-    incrementQuest(context.userId, QuestIds.WATCH_AD, 1, nk, logger);
+    incrementQuest(context.userId, QuestType.WatchAd, 1, nk, logger);
 }

@@ -367,8 +367,8 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 state.p2Blasts[state.p2Index]!.mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts[state.p2Index]!.mana, true);
             }
 
-            ({ blast: state.p1Blasts[state.p1Index]!, otherBlast: state.p2Blasts![state.p2Index] } = applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index]!, state.p2Blasts![state.p2Index]));
-            ({ blast: state.p2Blasts![state.p2Index], otherBlast: state.p1Blasts[state.p1Index]! } = applyStatusEffectAtEndOfTurn(state.p2Blasts![state.p2Index], state.p1Blasts[state.p1Index]!));
+            applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index], state.p2Blasts![state.p2Index], logger);
+            applyStatusEffectAtEndOfTurn(state.p2Blasts![state.p2Index], state.p1Blasts[state.p1Index], logger);
 
             checkIfMatchContinue(state);
 

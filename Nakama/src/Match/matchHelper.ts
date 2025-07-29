@@ -382,28 +382,32 @@ function updateStatModifier(mods: modifierBlastStruct[], stat: Stats, delta: num
 }
 
 
-function applyStatusEffectAtEndOfTurn(blast: BlastEntity, otherBlast: BlastEntity): { blast: BlastEntity, otherBlast: BlastEntity } {
+function applyStatusEffectAtEndOfTurn(blast: BlastEntity, otherBlast: BlastEntity, logger: nkruntime.Logger): void {
+
     switch (blast.status) {
         case Status.Burn:
-            blast.hp = Math.max(0, blast.hp - Math.floor(getMaxHp(blast) / 16));
+            const burnDamage = Math.max(3, Math.floor(getMaxHp(blast) / 8));
+            blast.hp = Math.max(0, blast.hp - burnDamage);
             break;
 
         case Status.Seeded:
-            const healAmount = Math.floor(getMaxHp(blast) / 16);
-
-            blast.hp = Math.max(0, blast.hp - healAmount);
-            otherBlast.hp = Math.min(getMaxHp(otherBlast), otherBlast.hp + healAmount);
+            const seedDamage = Math.max(2, Math.floor(getMaxHp(blast) / 16));
+            blast.hp = Math.max(0, blast.hp - seedDamage);
+            const healedAmount = Math.min(getMaxHp(otherBlast), otherBlast.hp + seedDamage) - otherBlast.hp;
+            otherBlast.hp += healedAmount;
             break;
 
         case Status.Wet:
-            blast.mana = Math.max(0, blast.mana - Math.floor(getMaxMana(blast) / 32));
+            const manaLoss = Math.max(2, Math.floor(getMaxMana(blast) / 16));
+            blast.mana = Math.max(0, blast.mana - manaLoss);
             break;
+
         default:
             break;
     }
-
-    return { blast, otherBlast };
 }
+
+
 
 function addPlatformType(p_platform: Type[], newType: Type): Type[] {
     if (p_platform.length < 3) {
@@ -704,15 +708,12 @@ function ApplyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Mo
     const attackerBaseAttack = getAttack(attacker);
     const attackerAttackModifier = getStatModifier(Stats.Attack, attacker.modifiers);
     const attackerAttack = attackerBaseAttack * attackerAttackModifier;
-    logger.debug(`Attacker attack modifier: ${attackerAttackModifier}`);
-    logger.debug(`Final attacker attack: ${attackerAttack}`);
 
     const defenderBaseDefense = getDefense(defender);
     const defenderDefenseModifier = getStatModifier(Stats.Defense, defender.modifiers);
     const defenderDefense = defenderBaseDefense * defenderDefenseModifier;
 
     const moveType = move.type;
-    logger.debug(`Move type: ${moveType}`);
 
     const defenderType = getBlastDataById(defender.data_id!).type;
     const movePower = move.power;
@@ -728,8 +729,6 @@ function ApplyBlastAttack(attacker: BlastEntity, defender: BlastEntity, move: Mo
         meteo,
         logger
     );
-
-    logger.debug(`Calculated damage: ${damage}`);
 
     defender.hp = clamp(defender.hp - damage, 0, Number.POSITIVE_INFINITY);
 

@@ -124,13 +124,6 @@ const PvEmatchLeave = function (ctx: nkruntime.Context, logger: nkruntime.Logger
         if (state.player1Id == presence.userId) {
 
             PvEPlayerLeave(nk, state, logger);
-            dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
-        }
-
-        if (state.player2Id == presence.userId) {
-
-            PvEPlayerLeave(nk, state, logger);
-            dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(true));
         }
 
         state.presences[presence.userId] = null;
@@ -271,7 +264,8 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
                 actionType === TurnType.Item ? (state.turnStateData.p1TurnData.itemUse = parsed.data) : (state.turnStateData.p1TurnData.index = parsed.data ?? 0);
 
-                if (message.opCode == OpCodes.PLAYER_LEAVE) {
+                
+                if (actionType == TurnType.Leave) {
                     PvEPlayerLeave(nk, state, logger);
 
                     const endDataWinner: EndStateData = {
@@ -279,7 +273,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                         trophyRewards: 0,
                     };
 
-                    dispatcher.broadcastMessage(OpCodes.MATCH_END, JSON.stringify(endDataWinner));
+                    dispatcher.broadcastMessage(OpCodes.OPPONENT_LEAVE, JSON.stringify(endDataWinner));
 
                     return null;
                 }

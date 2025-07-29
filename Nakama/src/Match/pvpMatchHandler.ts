@@ -269,7 +269,7 @@ const PvPmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
                 };
 
                 if (action.type == TurnType.Leave) {
-                    PlayerActionLeave(userId === state.player1Id, nk, state, logger, dispatcher, OpCodes.MATCH_END);
+                    PlayerActionLeave(userId === state.player2Id, nk, state, logger, dispatcher, OpCodes.OPPONENT_LEAVE);
                     return null;
                 }
 
@@ -599,19 +599,20 @@ function PlayerActionLeave(p1Win: boolean, nk: nkruntime.Nakama, state: PvPBattl
         trophyRewards: -20,
     };
 
-    if (p1Win) {
-        const p2Presence = state.presences[state.player2Id];
         const p1Presence = state.presences[state.player1Id];
+        const p2Presence = state.presences[state.player2Id];
 
-        if (p2Presence) {
-            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataLoser), [p2Presence]);
-        }
+    if (p1Win) {
+
+
         if (p1Presence) {
             dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataWinner), [p1Presence]);
         }
+        if (p2Presence) {
+            dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataLoser), [p2Presence]);
+        }
+
     } else {
-        const p1Presence = state.presences[state.player1Id];
-        const p2Presence = state.presences[state.player2Id];
 
         if (p1Presence) {
             dispatcher.broadcastMessage(opCodes, JSON.stringify(endDataLoser), [p1Presence]);

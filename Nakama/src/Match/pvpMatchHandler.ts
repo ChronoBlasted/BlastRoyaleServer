@@ -53,7 +53,7 @@ const PvPinitMatch = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
         meteo: Meteo.None,
 
-        turnDelay: 5000,
+        turnDelay: 20000,
         turnTimer: null,
 
         turnStateData: {

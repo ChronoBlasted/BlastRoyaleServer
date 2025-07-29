@@ -298,139 +298,123 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
 
 
         case BattleState.ResolveTurn:
-            switch (state.turnStateData.p1TurnData.type) {
-                // region Attack
-                case TurnType.Attack:
-                    state.turnStateData.p1TurnData.index = clamp(state.turnStateData.p1TurnData.index, 0, 3);
-                    let p1Move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![state.turnStateData.p1TurnData.index]);
-                    let p2Move = getMoveById(state.p2Blasts[state.p2Index]!.activeMoveset![state.turnStateData.p2TurnData.index]);
 
-                    if (p1Move == null) {
-                        ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready);
-                        break;
-                    }
+            logger.debug('______________ START RESOLVE TURN ______________');
+            logger.debug("Resolving turn: P1 Action: %s, P2 Action: %s", state.turnStateData.p1TurnData.type, state.turnStateData.p2TurnData.type);
 
-                    if (p2Move == null && state.turnStateData.p2TurnData.type == TurnType.Attack) {
-                        ErrorFunc(state, "Player 2 move null", dispatcher, BattleState.Ready);
-                        break;
-                    }
+            const p1 = state.turnStateData.p1TurnData;
+            const p2 = state.turnStateData.p2TurnData;
 
-                    let moveIndex = state.turnStateData.p2TurnData.index;
-                    if (moveIndex === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
-                        state.turnStateData.p2TurnData.type = TurnType.Wait;
-
-                        executePlayerAttack(true, state, logger, nk, dispatcher);
-
-                    } else {
-                        state.turnStateData.p2TurnData.type = TurnType.Attack;
-
-                        performAttackSequence(state, dispatcher, nk, logger);
-                    }
-
-                    break;
-                //region Player Use Item
-                case TurnType.Item:
-
-                    let msgItem = {} as ItemUseJSON;
-                    msgItem = state.turnStateData.p1TurnData.itemUse!;
-                    msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
-                    let item = state.player1Items[msgItem.index_item];
-
-                    if (item == null) {
-                        ErrorFunc(state, "Item to use is null", dispatcher, BattleState.Ready);
-                        break;
-                    }
-
-                    if (item.amount <= 0) {
-                        ErrorFunc(state, "U don't have enough item", dispatcher, BattleState.Ready);
-                        break;
-                    }
-
-                    useItem(nk, logger, state.player1Id, item);
-
-                    var itemData = getItemDataById(item.data_id);
-
-                    switch (itemData.behaviour) {
-                        case ITEM_BEHAVIOUR.Heal:
-                            state.p1Blasts[msgItem.index_blast] = healHealthBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
-                            break;
-                        case ITEM_BEHAVIOUR.Mana:
-                            state.p1Blasts[msgItem.index_blast] = healManaBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
-                            break;
-                        case ITEM_BEHAVIOUR.Status:
-                            state.p1Blasts[msgItem.index_blast] = healStatusBlast(state.p1Blasts[msgItem.index_blast], itemData.status!);
-                            break;
-                        case ITEM_BEHAVIOUR.Catch:
-                            var wildBlastCaptured = false;
-
-                            wildBlastCaptured = isBlastCaptured(state.p2Blasts![state.p2Index].hp, getMaxHp(state.p2Blasts![state.p2Index]), getBlastDataById(state.p2Blasts![state.p2Index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
-
-                            if (wildBlastCaptured) {
-                                logger.debug('Wild blast Captured !', wildBlastCaptured);
-
-                                state.battleState = BattleState.End;
-                            }
-
-                            state.turnStateData.catched = wildBlastCaptured;
-                            break;
-                        default:
-                            break;
-                    }
-
-                    if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
-                        state.turnStateData.p2TurnData.type = TurnType.Wait;
-                    } else {
-                        state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, nk, dispatcher);
-                    }
-                    break;
-                // region Player Change
-                case TurnType.Swap:
-                    var msgChangeBlast = clamp(state.turnStateData.p1TurnData.index, 0, state.p1Blasts.length - 1);
-
-                    if (state.p1Index == msgChangeBlast) {
-                        ErrorFunc(state, "Cannot change actual blast with actual blast", dispatcher, BattleState.Ready);
-                        break;
-                    }
-
-                    if (!isBlastAlive(state.p1Blasts[msgChangeBlast])) {
-                        ErrorFunc(state, "Cannot change actual blast with dead blast in Ready", dispatcher, BattleState.Ready);
-                        break;
-                    }
-
-                    state.p1Index = msgChangeBlast;
-
-                    if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
-                        state.turnStateData.p2TurnData.type = TurnType.Wait;
-                    } else {
-                        state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, nk, dispatcher);
-                    } break;
-                // region Player Wait
-                case TurnType.Wait:
-                    state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, true);
-
-                    if (state.turnStateData.p2TurnData.index === -1) {
-                        state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
-                        state.turnStateData.p2TurnData.type = TurnType.Wait;
-                    } else {
-                        state.turnStateData.p2TurnData.type = TurnType.Attack;
-                        executePlayerAttack(false, state, logger, nk, dispatcher);
-                    } break;
+            if (p1.type === TurnType.Swap) {
+                if (trySwapBlast(state.p1Index, p1, state.p1Blasts, i => state.p1Index = i, state, dispatcher)) break;
             }
 
-            // region End turn Logic
-            
+            if (p2.type === TurnType.Swap) {
+                if (trySwapBlast(state.p2Index, p2, state.p2Blasts, i => state.p2Index = i, state, dispatcher)) break;
+            }
+
+            if (p1.type === TurnType.Item) {
+                let msgItem = {} as ItemUseJSON;
+                msgItem = state.turnStateData.p1TurnData.itemUse!;
+                msgItem.index_item = clamp(msgItem.index_item, 0, state.player1Items.length - 1)
+                let item = state.player1Items[msgItem.index_item];
+
+                if (item == null) {
+                    ErrorFunc(state, "Item to use is null", dispatcher, BattleState.Ready);
+                    break;
+                }
+
+                if (item.amount <= 0) {
+                    ErrorFunc(state, "U don't have enough item", dispatcher, BattleState.Ready);
+                    break;
+                }
+
+                useItem(nk, logger, state.player1Id, item);
+
+                var itemData = getItemDataById(item.data_id);
+
+                switch (itemData.behaviour) {
+                    case ITEM_BEHAVIOUR.Heal:
+                        state.p1Blasts[msgItem.index_blast] = healHealthBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
+                        break;
+                    case ITEM_BEHAVIOUR.Mana:
+                        state.p1Blasts[msgItem.index_blast] = healManaBlast(state.p1Blasts[msgItem.index_blast], itemData.gain_amount);
+                        break;
+                    case ITEM_BEHAVIOUR.Status:
+                        state.p1Blasts[msgItem.index_blast] = healStatusBlast(state.p1Blasts[msgItem.index_blast], itemData.status!);
+                        break;
+                    case ITEM_BEHAVIOUR.Catch:
+                        var wildBlastCaptured = false;
+
+                        wildBlastCaptured = isBlastCaptured(state.p2Blasts![state.p2Index].hp, getMaxHp(state.p2Blasts![state.p2Index]), getBlastDataById(state.p2Blasts![state.p2Index].data_id).catchRate, itemData.catchRate!, 1) // TODO Get status bonus
+
+                        if (wildBlastCaptured) {
+                            logger.debug('Wild blast Captured !', wildBlastCaptured);
+
+                            state.battleState = BattleState.End;
+                        }
+
+                        state.turnStateData.catched = wildBlastCaptured;
+                        break;
+                    default:
+                        break;
+                }
+
+                if (state.turnStateData.p2TurnData.index === -1) {
+                    state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, true);
+                    state.turnStateData.p2TurnData.type = TurnType.Wait;
+                } else {
+                    state.turnStateData.p2TurnData.type = TurnType.Attack;
+                    executePlayerAttack(false, state, logger, nk, dispatcher);
+                }
+            }
+
+            if (p1.type === TurnType.Attack) {
+                p1.index = clamp(p1.index, 0, 3);
+                const move = getMoveById(state.p1Blasts[state.p1Index]!.activeMoveset![p1.index]);
+                if (!move) {
+                    ErrorFunc(state, "Player 1 move null", dispatcher, BattleState.Ready);
+                    break;
+                }
+            }
+
+            if (p2.type === TurnType.Attack) {
+                p2.index = clamp(p2.index, 0, 3);
+                const move = getMoveById(state.p2Blasts[state.p2Index]!.activeMoveset![p2.index]);
+                if (!move) {
+                    ErrorFunc(state, "Player 2 move null", dispatcher, BattleState.Ready);
+                    break;
+                }
+            }
+
+            if (p1.type === TurnType.Attack && p2.type === TurnType.Attack) {
+                performAttackSequence(state, dispatcher, nk, logger);
+            } else if (p1.type === TurnType.Attack) {
+                executePlayerAttack(true, state, logger, nk, dispatcher);
+            } else if (p2.type === TurnType.Attack) {
+                executePlayerAttack(false, state, logger, nk, dispatcher);
+            }
+
+            if (p1.type === TurnType.Wait) {
+                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, true);
+            }
+
+            if (p2.type === TurnType.Wait) {
+                state.p2Blasts[state.p2Index]!.mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts[state.p2Index]!.mana, true);
+            }
+
             applyStatusEffectAtEndOfTurn(state.p1Blasts[state.p1Index], state.p2Blasts![state.p2Index], logger);
             applyStatusEffectAtEndOfTurn(state.p2Blasts![state.p2Index], state.p1Blasts[state.p1Index], logger);
 
             checkIfMatchContinue(state);
 
-            if (isBlastAlive(state.p1Blasts[state.p1Index]!)) state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, false);
-            if (isBlastAlive(state.p2Blasts![state.p2Index])) state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, false);
+            if (isBlastAlive(state.p2Blasts![state.p2Index])) {
+                state.p2Blasts![state.p2Index].mana = calculateManaRecovery(getMaxMana(state.p2Blasts![state.p2Index]), state.p2Blasts![state.p2Index].mana, false);
+            }
+
+            if (isBlastAlive(state.p1Blasts[state.p1Index]!)) {
+                state.p1Blasts[state.p1Index]!.mana = calculateManaRecovery(getMaxMana(state.p1Blasts![state.p1Index]), state.p1Blasts[state.p1Index]!.mana, false);
+            }
 
             if (state.battleState == BattleState.End) {
                 dispatcher.broadcastMessage(OpCodes.NEW_BATTLE_TURN, JSON.stringify(state.turnStateData));
@@ -444,6 +428,7 @@ const PvEmatchLoop = function (ctx: nkruntime.Context, logger: nkruntime.Logger,
             EndLoopDebug(logger, state);
 
             break;
+
         // region WAIT_FOR_PLAYER_SWAP
         case BattleState.ResolvePlayerSwap:
 
